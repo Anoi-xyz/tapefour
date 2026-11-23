@@ -1,0 +1,19 @@
+{
+  "name": "tapefour",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node serve.js",
+    "test": "node test/test_subblocks.ts && node test/test_ui_logic.ts && node test/test_bot.ts",
+    "test:subblocks": "node test/test_subblocks.ts",
+    "test:random-games": "node test/test_random_games.ts",
+    "test:bot": "node test/test_bot.ts",
+    "test:ui": "node test/test_ui_logic.ts",
+    "test:onchain": "node test/test_onchain_eval.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "tsx": "^4.23.15",
+    "viem": "^2.58.4"
+  }
+}

@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>TapeFour — Connect Four on TapeOut Circuits</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-branding">
+        <h1 class="logo">Tape<span class="logo-accent">Four</span></h1>
+        <span class="version-tag" id="modeTag">Casual Mode</span>
+      </div>
+      <div class="header-actions">
+        <!-- Wallet connect button (shown only in ranked mode) -->
+        <button id="btnConnectWallet" class="btn btn-accent" style="display:none">Connect Wallet</button>
+        <button id="btnNewGame" class="btn btn-secondary">New Game</button>
+      </div>
+    </header>
+
+    <!-- Controls / Settings Bar -->
+    <div class="controls-bar">
+      <div class="control-group">
+        <label for="selectMode">Mode</label>
+        <select id="selectMode" class="dropdown">
+          <option value="human-vs-bot">Human vs Bot (Casual)</option>
+          <option value="two-human">Two Players (Local)</option>
+          <option value="ranked" id="rankedOption" disabled>Ranked (On-Chain)</option>
+        </select>
+      </div>
+      <div class="control-group" id="diffGroup">
+        <label for="selectDifficulty">Difficulty</label>
+        <select id="selectDifficulty" class="dropdown">
+          <option value="easy">Easy (Depth 1)</option>
+          <option value="medium" selected>Medium (Depth 3)</option>
+          <option value="hard">Hard (Depth 5)</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label for="selectEngine">Engine</label>
+        <select id="selectEngine" class="dropdown">
+          <option value="local">Local Circuit Simulator</option>
+          <option value="onchain" id="onchainOption" disabled>On-Chain Eval (Phase 3)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Ranked Panel (hidden unless ranked mode is active) -->
+    <div class="ranked-panel" id="rankedPanel" style="display:none">
+      <div class="ranked-info">
+        <span class="ranked-label">🏆 Ranked Mode</span>
+        <span class="ranked-fee" id="rankedFeeDisplay">Fee: 0.005 OKB (60% Pool / 40% Treasury)</span>
+        <span class="ranked-status" id="rankedStatusMsg">Connect wallet to start</span>
+      </div>
+      <div class="ranked-tx" id="rankedTxPanel" style="display:none">
+        <span class="tx-label">Tx:</span>
+        <a id="rankedTxLink" href="#" target="_blank" class="tx-hash">—</a>
+        <span id="rankedTxStatus" class="tx-status">pending</span>
+      </div>
+      <div class="ranked-game-info" id="rankedGameInfo" style="display:none">
+        <span>Game ID: <b id="rankedGameId">—</b></span>
+        <span>Round: <b id="rankedWeekLabel">Week 1</b></span>
+        <span>Est. Move Gas: <b>~3.45M</b></span>
+        <span>Wins in <b id="rankedWinsWeekLabel">this week</b>: <b id="rankedWins">0</b></span>
+      </div>
+      <!-- Bot Timeout Warning & Refund Button -->
+      <div class="bot-timeout-bar" id="botTimeoutBar" style="display:none">
+        <span id="botTimeoutMsg" class="timeout-msg">⚠️ Bot has taken longer than usual.</span>
+        <button id="btnClaimBotRefund" class="btn btn-warning" style="display:none">Claim 100% Refund (Timeout)</button>
+      </div>
+    </div>
+
+    <!-- Status & Turn Indicator -->
+    <div class="status-panel">
+      <div class="turn-indicator">
+        <span class="player-dot dot-a" id="turnDot"></span>
+        <span class="status-text" id="statusMessage">Player A's Turn</span>
+      </div>
+      <!-- Verification Badge -->
+      <div class="verification-badge" id="verificationBadge">
+        <span class="badge-icon">⚡</span>
+        <span class="badge-label" id="badgeSource">Verified: local circuit simulation</span>
+        <button id="btnInspectMove" class="btn-inspect" title="Inspect Circuit Verification" style="display:none">Verify move</button>
+      </div>
+    </div>
+
+    <!-- Connect Four Board -->
+    <main class="board-container">
+      <!-- Column Drop Indicators (hover on desktop, click on mobile) -->
+      <div class="column-pickers" id="columnPickers">
+        <button class="col-picker" data-col="0">▼</button>
+        <button class="col-picker" data-col="1">▼</button>
+        <button class="col-picker" data-col="2">▼</button>
+        <button class="col-picker" data-col="3">▼</button>
+        <button class="col-picker" data-col="4">▼</button>
+        <button class="col-picker" data-col="5">▼</button>
+        <button class="col-picker" data-col="6">▼</button>
+      </div>
+
+      <!-- 7x6 Grid -->
+      <div class="board-frame" id="boardFrame">
+        <!-- Cells generated dynamically (row 5 at top, row 0 at bottom) -->
+      </div>
+    </main>
+
+    <!-- Score & Stats Footnote -->
+    <footer class="app-footer">
+      <div class="stats-row">
+        <div class="stat-pill"><span class="label">Circuit:</span> 1,479 NAND Gates</div>
+        <div class="stat-pill"><span class="label">Format:</span> TAP-02 Netlist</div>
+        <div class="stat-pill"><span class="label">Total Moves:</span> <span id="statMovesCount">0</span></div>
+        <div class="stat-pill" id="rankedStatPill" style="display:none">
+          <span class="label">Game:</span> <span id="statGameId">—</span>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Move Verification Modal -->
+  <div class="modal-backdrop" id="modalBackdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Circuit Move Verification</h3>
+        <button class="btn-close" id="btnCloseModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-section">
+          <h4>Verification Source</h4>
+          <p id="modalSource" class="mono text-highlight">local circuit simulation</p>
+          <small class="text-muted">Pure combinational evaluation of the 1,356-gate TAP-02 netlist.</small>
+        </div>
+        <div class="modal-section">
+          <h4>Circuit Inputs (88 bits)</h4>
+          <pre id="modalInputHex" class="code-box">0x00...</pre>
+          <div class="bit-breakdown" id="modalInputBreakdown">
+            <!-- Dynamic bit breakdown -->
+          </div>
+        </div>
+        <div class="modal-section">
+          <h4>Circuit Outputs (87 bits)</h4>
+          <pre id="modalOutputHex" class="code-box">0x00...</pre>
+          <div class="bit-breakdown" id="modalOutputBreakdown">
+            <!-- Dynamic bit breakdown -->
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" id="btnModalCloseAction">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ranked: Start Ranked Game Modal -->
+  <div class="modal-backdrop" id="rankedStartModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">🏆 Start Ranked Game</h3>
+        <button class="btn-close" id="btnCloseRankedModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-section">
+          <h4>How it works</h4>
+          <ul class="ranked-info-list">
+            <li>Pay the ranked fee to start a game on X Layer.</li>
+            <li>Each of your moves is submitted via a session key — no wallet pop-up per move.</li>
+            <li>The bot operator submits bot moves on-chain.</li>
+            <li>Every move is validated by the TapeOut circuit on-chain.</li>
+            <li>Win to climb the weekly leaderboard and earn prize pool shares.</li>
+          </ul>
+        </div>
+        <div class="modal-section">
+          <div class="ranked-fee-breakdown">
+            <div class="fee-row"><span>Ranked fee:</span> <b id="modalFeeAmt">0.005 OKB</b></div>
+            <div class="fee-row"><span>→ Weekly prize pool:</span> <b>60%</b></div>
+            <div class="fee-row"><span>→ Project treasury:</span> <b>40%</b></div>
+            <div class="fee-row"><span>Est. move gas:</span> <b>~3.45M gas</b></div>
+            <div class="fee-row"><span>Bot timeout refund:</span> <b>10 minutes (100% refund)</b></div>
+          </div>
+        </div>
+        <div class="modal-section">
+          <p class="trust-note">
+            <b>Trust note:</b> The bot operator chooses which column to play.
+            The on-chain circuit still validates move legality — the operator
+            cannot play an illegal move. The fee remains escrowed in the contract
+            and can be 100% refunded by you if the bot fails to respond within 10 minutes.
+          </p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="btnCancelRanked">Cancel</button>
+        <button class="btn btn-accent" id="btnConfirmRanked">Pay & Start</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Unified Configuration for X Layer & TapeOut -->
+  <script src="config.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

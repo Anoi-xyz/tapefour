@@ -1,0 +1,9 @@
+node_modules/
+artifacts/
+cache/
+out/
+typechain-types/
+scripts/c4_netlist.bin
+.env
+.env.*
+!.env.example

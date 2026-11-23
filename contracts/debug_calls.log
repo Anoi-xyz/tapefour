@@ -1,0 +1,19 @@
+Start
+Ready. Testing 20 calls...
+Before Call 0
+Call 0 SUCCESS: 450ms, res=0x03000000
+Before Call 1
+Call 1 SUCCESS: 347ms, res=0x05000000
+Before Call 2
+Call 2 SUCCESS: 582ms, res=0x09000000
+Before Call 3
+Call 3 SUCCESS: 919ms, res=0x11000000
+Before Call 4
+Call 4 SUCCESS: 419ms, res=0x21000000
+Before Call 5
+Call 5 SUCCESS: 378ms, res=0x41000000
+Before Call 6
+Call 6 SUCCESS: 483ms, res=0x81000000
+Before Call 7
+Call 7 SUCCESS: 498ms, res=0x03000000
+Before Call 8
