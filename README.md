@@ -85,103 +85,80 @@ Each game awards **0.002 OKB** (40% of 0.005 OKB) to the project treasury upon c
 
 ---
 
-## 🚀 Deployment & Tape-Out Guide
+## 🚀 Live Mainnet Deployment (X Layer Chain ID 196)
 
-### Prerequisites
-* Throwaway private key configured in `.env` (never commit real funds).
-* Minimum funds required on deployer wallet:
-  * **0.12 BEM** on X Layer (Token: `0x60e62efa9405d6873c5deabd4e6cc91c25363952`)
-  * **0.01 OKB** on X Layer (for tape-out fee and deployment gas)
+TapeFour is **live on X Layer mainnet**. Both the custom circuit processor and the TapeFour ranked game contract are fully deployed, verified, and configured:
 
-### Step 1: Tape Out the Circuit
-The tape-out script verifies the BEM token address, checks deployer balances/allowances, creates the CPU container, mints 1,479 transistors, and tapes out the netlist:
+| Component | Mainnet Address / ID | Transaction / Block Details |
+| :--- | :--- | :--- |
+| **TapeOut CPU Container** | `0xc849714d70A5c1bE8A456C47c644fe90D5B1625C` | Created in tx `0x74723760...` |
+| **Taped-Out Circuit** | **Circuit ID: `1`** (1,479 NAND Gates) | Minted in `0x481f4dbe...`, Taped out in `0x5446643f...` |
+| **TapeFour Contract** | `0x1c319c3bcb9ed1c35507f029c8e7152ab0590c04` | Deployed at block `76781513` (tx `0x3e9c900e...`) |
+| **Project Treasury** | `0xb1c17d49869b79dc8f96e01078cf6799db1b3ccc` | 40% of ranked entry fees |
+| **Bot Operator** | `0x3318600906c5f72b02be32aad973de8e206add41` | Authorized signer for bot moves |
+| **Multicall3 Verification** | 5,000 / 5,000 positions verified | 100% bit-for-bit on-chain match (0 mismatches) |
+
+---
+
+## 📜 Deployment & Verification History
+
+### 1. Circuit Tape-Out (`scripts/tapeout.ts`)
+* **BEM Approvals & Container Creation**: Deployer approved exact BEM amounts to the CPU Factory (`0x1f09daefa827f02cbb40967cc91b259763760761`) and created processor `0xc849714d70A5c1bE8A456C47c644fe90D5B1625C`.
+* **Transistor Minting**: Minted 1,479 transistors on-chain for the TAP-02 netlist.
+* **Netlist Tape-Out**: Pinned Circuit ID 1 onto the processor container. Full records logged to `deployments.json`.
+
+### 2. Contract Deployment (`scripts/deploy.ts`)
+* Pre-flight checks read live X Layer state to ensure the processor bytecode existed, verified factory origin, and verified that on-chain `netlist(1)` was 100% byte-identical to `scripts/c4_netlist.bin`.
+* Strict address separation verified that Treasury (`0xb1c1...`) and Operator (`0x3318...`) were distinct and non-zero.
+* `TapeFour.sol` deployed with immutable parameters: 0.005 OKB fee, 60% prize pool, 40% treasury, 24h move timeout, 10m bot timeout.
+
+### 3. Post-Deploy Multicall Verification (`scripts/verify_multicall.ts`)
+Ran 5,000 randomized legal game positions (including wins, draws, and edge columns) through canonical Multicall3 (`0xcA11bde05977b3631167028862bE2a173976CA11`) directly against the live on-chain processor on X Layer:
 ```bash
-# Dry run simulation
-npx tsx scripts/tapeout.ts --dry-run
-
-# Live tape-out (requires manual confirmation)
-npx tsx scripts/tapeout.ts
+npx tsx scripts/verify_multicall.ts --count 5000 --batch 10
+# Result: 5,000 / 5,000 matches, 0 mismatches, 0 call errors (100% match)
 ```
-*Outputs `PROCESSOR_ADDRESS` and `CIRCUIT_ID` and saves them to `deployments.json`.*
 
-### Step 2: Deploy the TapeFour Contract
+### 4. Read-Only Contract Verification (`scripts/read_contract.ts`)
+Inspects the deployed contract on X Layer to verify all immutable settings and current ISO week:
 ```bash
-# Dry run deployment check
-npx tsx scripts/deploy.ts --dry-run
-
-# Live contract deployment
-npx tsx scripts/deploy.ts
-```
-*Saves contract address and deployment transaction to `deployments.json`.*
-
-### Step 3: Post-Deploy Verification Script
-Run 5,000 random on-chain evaluations via canonical Multicall3 (`0xcA11bde05977b3631167028862bE2a173976CA11`) to verify the deployed circuit against the local simulator:
-```bash
-npx tsx scripts/verify_multicall.ts --count 5000 --batch 100
+npx tsx scripts/read_contract.ts
 ```
 
 ---
 
-## 🌐 Hosting Guide
+## 🌐 What's Left to Host
 
-### 1. Hosting the Web Application (`web/`)
-The web application is 100% static with no compilation or bundler requirements.
+With smart contracts and processor circuits permanently deployed on X Layer, the remaining hosting tasks are:
 
-1. **Configuration**:
-   Update `web/config.js` with the deployed contract address from `deployments.json`:
-   ```javascript
-   window.TAPEFOUR_CONFIG = {
-     rankedEnabled: true,
-     contractAddress: '0xYourDeployedContractAddress',
-     processorAddress: '0xYourProcessorAddress',
-     circuitId: 1,
-     rpcUrl: 'https://rpc.xlayer.tech',
-     chainId: 196,
-     rankedFee: '0.005',
-     poolSharePct: 60,
-     treasurySharePct: 40,
-     botTimeoutSec: 600,
-   };
-   ```
+### 1. Static Web Application (`web/`)
+The front-end is 100% static HTML/CSS/ES modules. `web/config.js` is already wired to the live contract and public RPC (`https://rpc.xlayer.tech`).
+* **Deploy**: Upload `web/` to any static host (Cloudflare Pages, Vercel, Netlify, GitHub Pages, or VPS nginx/caddy).
+* **Local Preview**:
+  ```bash
+  npx serve web -p 3000
+  ```
 
-2. **Static Deployment Options**:
-   * **Cloudflare Pages**: Connect repo and set build output directory to `web/` (build command: none).
-   * **Netlify / Vercel**: Publish directory: `web/`.
-   * **Static HTTP Server** (Local / VPS):
-     ```bash
-     npx serve web -p 3000
-     ```
-
-### 2. Hosting the Autonomous Bot Operator Service (`bot/`)
-
-The operator service monitors the chain for human moves and responds automatically.
-
-1. **Environment Variables (`.env`)**:
-   ```ini
-   XLAYER_RPC_URL=https://rpc.xlayer.tech
-   BOT_OPERATOR_KEY=your_throwaway_operator_private_key
-   TAPEFOUR_ADDRESS=0xYourDeployedContractAddress
-   BOT_DIFFICULTY=medium
-   ```
-
-2. **Standalone Runner with Automatic Restart**:
-   * **Linux / macOS**:
-     ```bash
-     chmod +x bot/start_operator.sh
-     ./bot/start_operator.sh
-     ```
-   * **Windows**:
-     ```cmd
-     bot\start_operator.bat
-     ```
-
-3. **Production PM2 Process Manager**:
-   ```bash
-   npm install -g pm2
-   pm2 start bot/ecosystem.config.cjs
-   pm2 logs tapefour-operator
-   pm2 startup
-   ```
+### 2. Autonomous Bot Operator Service (`bot/`)
+The bot operator service listens for `MovePlayed` events on X Layer, computes moves with minimax, and submits `playBotMove`.
+* **Configuration**: Set in `.env`:
+  ```ini
+  XLAYER_RPC_URL=https://rpc.xlayer.tech
+  BOT_OPERATOR_KEY=your_operator_private_key   # Must derive to 0x3318600906c5f72b02be32aad973de8e206add41
+  TAPEFOUR_ADDRESS=0x1c319c3bcb9ed1c35507f029c8e7152ab0590c04
+  BOT_DIFFICULTY=medium
+  ```
+* **Dry-Run Mode (Observation only, zero gas, no transactions)**:
+  ```bash
+  npx tsx bot/operator.ts --dry-run
+  ```
+* **Production Daemon (PM2 / systemd)**:
+  ```bash
+  npm install -g pm2
+  pm2 start "npx tsx bot/operator.ts" --name tapefour-operator
+  pm2 logs tapefour-operator
+  ```
+  *Ensure the operator wallet (`0x3318600906c5f72b02be32aad973de8e206add41`) maintains a small OKB balance on X Layer (~0.05 OKB) to pay transaction gas.*
 
 ---
 

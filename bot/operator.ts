@@ -13,8 +13,8 @@
 //   strength.
 //
 // Usage:
-//   node bot/operator.ts
-//   BOT_DIFFICULTY=hard node bot/operator.ts
+//   npx tsx bot/operator.ts [--dry-run]
+//   BOT_DIFFICULTY=hard npx tsx bot/operator.ts [--dry-run]
 
 import { readFileSync, existsSync } from 'fs';
 import { dirname, join } from 'path';
@@ -24,6 +24,8 @@ import { privateKeyToAccount } from 'viem/accounts';
 import { selectBotMove, type Difficulty } from './minimax.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+const DRY_RUN = process.argv.includes('--dry-run');
 
 // ---- Config ----------------------------------------------------------------
 function loadDotEnv(filepath: string): Record<string, string> {
@@ -38,10 +40,18 @@ function loadDotEnv(filepath: string): Record<string, string> {
 }
 const env = loadDotEnv(join(__dirname, '../.env'));
 
-const RPC_URL         = env.XLAYER_RPC_URL   ?? 'https://rpc.xlayer.tech';
-const OPERATOR_KEY    = env.BOT_OPERATOR_KEY;
-const CONTRACT_ADDR   = env.TAPEFOUR_ADDRESS;
-const DIFFICULTY      = (process.env.BOT_DIFFICULTY ?? env.BOT_DIFFICULTY ?? 'medium') as Difficulty;
+const RPC_URL         = process.env.XLAYER_RPC_URL   ?? env.XLAYER_RPC_URL   ?? 'https://rpc.xlayer.tech';
+const OPERATOR_KEY    = process.env.BOT_OPERATOR_KEY ?? env.BOT_OPERATOR_KEY;
+let CONTRACT_ADDR     = process.env.TAPEFOUR_ADDRESS ?? env.TAPEFOUR_ADDRESS;
+
+if (!CONTRACT_ADDR && existsSync(join(__dirname, '../deployments.json'))) {
+  try {
+    const d = JSON.parse(readFileSync(join(__dirname, '../deployments.json'), 'utf8'));
+    if (d.tapeFour) CONTRACT_ADDR = d.tapeFour;
+  } catch {}
+}
+
+const DIFFICULTY      = (process.env.BOT_DIFFICULTY  ?? env.BOT_DIFFICULTY  ?? 'medium') as Difficulty;
 
 // Rate limiting: max 1 bot move per N ms to avoid spamming the RPC
 const MIN_MOVE_INTERVAL_MS = 500;
@@ -56,7 +66,8 @@ if (!CONTRACT_ADDR) {
 }
 
 // ---- Chain setup -----------------------------------------------------------
-const account = privateKeyToAccount(`0x${OPERATOR_KEY}` as `0x${string}`);
+const formattedKey = (OPERATOR_KEY.startsWith('0x') ? OPERATOR_KEY : `0x${OPERATOR_KEY}`) as `0x${string}`;
+const account = privateKeyToAccount(formattedKey);
 const chain = {
   id: 196,
   name: 'X Layer',
@@ -72,6 +83,7 @@ const ABI = parseAbi([
   'event GameEnded(uint256 indexed gameId, uint8 status, address winner)',
   'function games(uint256) view returns (address human, address sessionKey, uint256 board, uint8 turn, uint8 status, uint64 lastMoveAt, uint64 fee)',
   'function playBotMove(uint256 gameId, uint8 col) nonpayable',
+  'function botOperator() view returns (address)',
 ]);
 
 const BOARD_MASK = (1n << 42n) - 1n;
@@ -126,6 +138,11 @@ async function processBotMove(gameId: bigint): Promise<void> {
     const col = selectBotMove(boardA, boardB, 1 /* bot is player B */, DIFFICULTY);
     log(`Game ${gameId}: bot chose col=${col}`);
 
+    if (DRY_RUN) {
+      log(`[DRY RUN] Game ${gameId}: would call playBotMove(gameId=${gameId}, col=${col}). Skipping transaction.`);
+      return;
+    }
+
     // Submit the move
     const hash = await wal.writeContract({
       address: CONTRACT_ADDR as `0x${string}`,
@@ -151,11 +168,33 @@ async function processBotMove(gameId: bigint): Promise<void> {
 
 // ---- Event watcher ---------------------------------------------------------
 async function watchEvents(): Promise<void> {
-  log(`Starting operator service`);
-  log(`Operator address: ${account.address}`);
-  log(`Contract: ${CONTRACT_ADDR}`);
-  log(`RPC: ${RPC_URL}`);
+  log(`Starting operator service [mode: ${DRY_RUN ? 'DRY-RUN (read-only, no txs)' : 'LIVE'}]`);
+  log(`Operator address from key: ${account.address}`);
+  log(`Contract address: ${CONTRACT_ADDR}`);
+  log(`RPC URL: ${RPC_URL.replace(/:\/\/.*@/, '://')}`); // sanitize if any basic auth
   log(`Difficulty: ${DIFFICULTY}`);
+
+  // Startup verification: check code and botOperator() on-chain
+  const code = await pub.getCode({ address: CONTRACT_ADDR as `0x${string}` });
+  if (!code || code === '0x') {
+    log(`FATAL: No contract deployed at ${CONTRACT_ADDR}`);
+    process.exit(1);
+  }
+
+  const onChainOperator = await pub.readContract({
+    address: CONTRACT_ADDR as `0x${string}`,
+    abi: ABI,
+    functionName: 'botOperator',
+  }) as string;
+
+  log(`Contract botOperator: ${onChainOperator}`);
+
+  if (account.address.toLowerCase() !== onChainOperator.toLowerCase()) {
+    log(`FATAL: Operator key address (${account.address}) does NOT match contract botOperator (${onChainOperator}). Refusing to run.`);
+    process.exit(1);
+  }
+
+  log(`Authorization verified: local key address matches contract botOperator.`);
   log('Watching for MovePlayed events...');
 
   // Poll for new events every 3 seconds (X Layer block time ~1-2s)

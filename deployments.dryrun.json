@@ -1,0 +1,14 @@
+{
+  "network": "xlayer",
+  "chainId": 196,
+  "processor": "0xc849714d70A5c1bE8A456C47c644fe90D5B1625C",
+  "circuitId": 1,
+  "treasury": "0xb1c17d49869b79dc8f96e01078cf6799db1b3ccc",
+  "botOperator": "0x3318600906c5f72b02be32aad973de8e206add41",
+  "rankedFee": "0.005",
+  "poolBps": 6000,
+  "botTimeout": 600,
+  "moveTimeout": 86400,
+  "status": "DRY_RUN",
+  "updatedAt": "2026-11-24T20:01:08.140Z"
+}

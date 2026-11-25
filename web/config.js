@@ -13,13 +13,12 @@ window.TAPEFOUR_CONFIG = {
   explorerBase: 'https://www.oklink.com/xlayer/tx/',
 
   // TapeOut Circuit & Processor
-  processorAddress: '0xd47C1A47d809438d66fd472cd2A30392ace4e581',
+  processorAddress: '0xc849714d70A5c1bE8A456C47c644fe90D5B1625C',
   circuitId: 1,
   gateCount: 1479,
 
-  // TapeFour Ranked Game Contract
-  // Update after running scripts/deploy.ts
-  contractAddress: '0x0000000000000000000000000000000000000000',
+  // TapeFour Ranked Game Contract (Deployed on X Layer Mainnet)
+  contractAddress: '0x1c319c3bcb9ed1c35507f029c8e7152ab0590c04',
 
   // Game Economy & Timing Parameters
   rankedFee: '0.005', // 0.005 OKB
@@ -30,6 +29,8 @@ window.TAPEFOUR_CONFIG = {
   botTimeoutSec: 600,    // 10 minutes (600 seconds)
 
   // Gas estimates
+  startRankedGas: 300000,
+  timeoutRefundGas: 200000,
   estimatedMoveGas: 3450000,
   estimatedGameGas: 52000000,
 };

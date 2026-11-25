@@ -15,8 +15,25 @@
         <span class="version-tag" id="modeTag">Casual Mode</span>
       </div>
       <div class="header-actions">
-        <!-- Wallet connect button (shown only in ranked mode) -->
-        <button id="btnConnectWallet" class="btn btn-accent" style="display:none">Connect Wallet</button>
+        <!-- Wallet connect button & account menu (shown only in ranked mode) -->
+        <div class="wallet-control-container">
+          <button id="btnConnectWallet" class="btn btn-accent" style="display:none">Connect Wallet</button>
+          <div class="wallet-menu" id="walletMenu" style="display:none">
+            <button class="wallet-menu-item" id="btnCopyAddress">
+              <span class="menu-icon">📋</span> <span id="copyAddressText">Copy address</span>
+            </button>
+            <a class="wallet-menu-item" id="linkViewExplorer" href="#" target="_blank" rel="noopener">
+              <span class="menu-icon">↗</span> View on OKLink
+            </a>
+            <button class="wallet-menu-item" id="btnSwitchWallet">
+              <span class="menu-icon">🔄</span> Switch wallet
+            </button>
+            <div class="wallet-menu-divider"></div>
+            <button class="wallet-menu-item text-danger" id="btnDisconnectWallet">
+              <span class="menu-icon">🔌</span> Disconnect
+            </button>
+          </div>
+        </div>
         <button id="btnNewGame" class="btn btn-secondary">New Game</button>
       </div>
     </header>
@@ -43,9 +60,15 @@
         <label for="selectEngine">Engine</label>
         <select id="selectEngine" class="dropdown">
           <option value="local">Local Circuit Simulator</option>
-          <option value="onchain" id="onchainOption" disabled>On-Chain Eval (Phase 3)</option>
+          <option value="onchain" id="onchainOption" disabled>On-Chain Eval (TapeOut)</option>
         </select>
       </div>
+    </div>
+
+    <!-- Wrong Network Warning Bar -->
+    <div class="network-warning-bar" id="networkWarningBar" style="display:none">
+      <span class="warning-msg" id="networkWarningMsg">⚠️ Wrong Network: TapeFour requires X Layer (Chain ID 196).</span>
+      <button id="btnSwitchNetwork" class="btn btn-warning-action">Switch to X Layer</button>
     </div>
 
     <!-- Ranked Panel (hidden unless ranked mode is active) -->
@@ -53,6 +76,7 @@
       <div class="ranked-info">
         <span class="ranked-label">🏆 Ranked Mode</span>
         <span class="ranked-fee" id="rankedFeeDisplay">Fee: 0.005 OKB (60% Pool / 40% Treasury)</span>
+        <span class="operator-badge checking" id="operatorBadge">Operator: checking...</span>
         <span class="ranked-status" id="rankedStatusMsg">Connect wallet to start</span>
       </div>
       <div class="ranked-tx" id="rankedTxPanel" style="display:none">
@@ -130,7 +154,7 @@
         <div class="modal-section">
           <h4>Verification Source</h4>
           <p id="modalSource" class="mono text-highlight">local circuit simulation</p>
-          <small class="text-muted">Pure combinational evaluation of the 1,356-gate TAP-02 netlist.</small>
+          <small class="text-muted">Pure combinational evaluation of the <span id="modalGateCount">1,479</span>-gate TAP-02 netlist.</small>
         </div>
         <div class="modal-section">
           <h4>Circuit Inputs (88 bits)</h4>
@@ -192,6 +216,59 @@
       <div class="modal-footer">
         <button class="btn btn-secondary" id="btnCancelRanked">Cancel</button>
         <button class="btn btn-accent" id="btnConfirmRanked">Pay & Start</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Wallet Picker Modal (EIP-6963) -->
+  <div class="modal-backdrop" id="walletModal">
+    <div class="modal-card wallet-modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Connect a wallet</h3>
+        <button class="btn-close" id="btnCloseWalletModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="wallet-list" id="walletList">
+          <!-- Discovered EIP-6963 / injected wallets listed here -->
+        </div>
+        <div class="no-wallets-message" id="noWalletsMessage" style="display:none">
+          <p>No EVM wallet detected.</p>
+          <p class="install-prompt">Install one of these recommended wallets to play on X Layer:</p>
+          <div class="wallet-install-links">
+            <a href="https://metamask.io/download/" target="_blank" rel="noopener" class="wallet-install-item">
+              <span>MetaMask</span> ↗
+            </a>
+            <a href="https://rabby.io/" target="_blank" rel="noopener" class="wallet-install-item">
+              <span>Rabby Wallet</span> ↗
+            </a>
+            <a href="https://www.okx.com/web3" target="_blank" rel="noopener" class="wallet-install-item">
+              <span>OKX Wallet</span> ↗
+            </a>
+            <a href="https://zerion.io/" target="_blank" rel="noopener" class="wallet-install-item">
+              <span>Zerion Wallet</span> ↗
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Disconnect Active Game Warning Modal -->
+  <div class="modal-backdrop" id="disconnectWarningModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">⚠️ Active Game Warning</h3>
+        <button class="btn-close" id="btnCloseDisconnectWarning">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>A ranked game (<b id="disconnectGameId">#—</b>) is currently in progress.</p>
+        <p class="text-muted" style="margin-top:8px; line-height:1.5;">
+          Your session key will be kept safe in this browser so you can reconnect anytime to resume playing or claim a 100% refund if the bot times out.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="btnCancelDisconnect">Cancel</button>
+        <button class="btn btn-warning" id="btnConfirmDisconnect">Disconnect Anyway</button>
       </div>
     </div>
   </div>

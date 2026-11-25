@@ -1,5 +1,5 @@
 // Connect Four Circuit and Engine for Web Front End
-// Evaluates identical TAP-02 1,356 NAND gate netlist in the browser
+// Evaluates identical TAP-02 1,479 NAND gate netlist in the browser
 
 export const COLS = 7;
 export const ROWS = 6;
@@ -437,7 +437,7 @@ export class OnChainEvalRulesEngine {
 
   async evaluateMove(boardA, boardB, col, turn) {
     if (!this.processorAddress || this.circuitId === null) {
-      throw new Error('OnChainEval: Connect Four circuit not yet taped out on-chain (Phase 3).');
+      throw new Error('OnChainEval: Connect Four circuit not configured.');
     }
     const inBytes = packInputs(boardA, boardB, col, turn);
     const inHex = Array.from(inBytes).map(b => b.toString(16).padStart(2, '0')).join('');

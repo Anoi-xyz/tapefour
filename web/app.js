@@ -7,9 +7,9 @@ import {
   OnChainEvalRulesEngine,
   WINNING_LINES,
 } from './engine.js';
+import { WalletManager } from './wallet.js';
 
-// ---- Ranked mode: minimal EIP-1193 wallet integration ----------------------
-// No external wallet library — we use window.ethereum directly.
+// ---- Ranked mode: EIP-6963 multi-injected wallet integration ----------------
 
 const CFG = window.TAPEFOUR_CONFIG ?? {};
 
@@ -42,16 +42,9 @@ function getOrCreateSessionKey() {
   return priv;
 }
 
-// Derive secp256k1 public key from private key (browser — using SubtleCrypto + noble/curves not available,
-// so we use a simplified approach: generate a keypair using ECDH on P-256 as a stand-in for address derivation.
-// For the actual session key address registration we'll use eth_accounts[0] in a real deploy.
 // In this integration, the session key is the user's own wallet account (simpler, same security).
 // The contract accepts msg.sender == sessionKey OR msg.sender == human, so using the wallet for both is fine.
 async function getSessionKeyAddress(walletAddress) {
-  // Simplest: use the wallet address itself as "session key" address
-  // The user signs playMove() tx from their wallet (no session-key benefit yet)
-  // In a production deployment, generate a proper session key using noble/curves
-  // and sign with it — but that requires bundling an EC library.
   return walletAddress;
 }
 
@@ -70,14 +63,6 @@ async function rpcCall(method, params = []) {
 
 async function readContractView(addr, data) {
   return rpcCall('eth_call', [{ to: addr, data }, 'latest']);
-}
-
-async function sendRankedTx(walletAddr, to, data, value = '0x0') {
-  // Request user to send the tx via wallet
-  return window.ethereum.request({
-    method: 'eth_sendTransaction',
-    params: [{ from: walletAddr, to, data, value }],
-  });
 }
 
 async function waitForReceipt(txHash) {
@@ -105,6 +90,15 @@ class ConnectFourApp {
     this.moveCount = 0;
     this.lastVerification = null;
     this.winningCells = [];
+
+    // Wallet Manager (EIP-6963)
+    this.wallet = new WalletManager({
+      chainId: CFG.chainId || 196,
+      rpcUrl: CFG.rpcUrl || 'https://rpc.xlayer.tech',
+    });
+    this.wallet.initDiscovery();
+    this.wallet.onAccountsChanged = (accounts) => this.handleAccountsChanged(accounts);
+    this.wallet.onChainChanged = (chainId) => this.handleChainChanged(chainId);
 
     // Ranked state
     this.walletAddress = null;
@@ -147,7 +141,28 @@ class ConnectFourApp {
     this.btnNewGame       = document.getElementById('btnNewGame');
     this.btnConnectWallet = document.getElementById('btnConnectWallet');
 
-    // Ranked panel
+    // Wallet Menu & Picker Elements
+    this.walletMenu       = document.getElementById('walletMenu');
+    this.btnCopyAddress   = document.getElementById('btnCopyAddress');
+    this.copyAddressText  = document.getElementById('copyAddressText');
+    this.linkViewExplorer = document.getElementById('linkViewExplorer');
+    this.btnSwitchWallet  = document.getElementById('btnSwitchWallet');
+    this.btnDisconnectWallet = document.getElementById('btnDisconnectWallet');
+    this.walletModal      = document.getElementById('walletModal');
+    this.btnCloseWalletModal = document.getElementById('btnCloseWalletModal');
+    this.walletList       = document.getElementById('walletList');
+    this.noWalletsMessage = document.getElementById('noWalletsMessage');
+    this.disconnectWarningModal = document.getElementById('disconnectWarningModal');
+    this.btnCloseDisconnectWarning = document.getElementById('btnCloseDisconnectWarning');
+    this.btnCancelDisconnect = document.getElementById('btnCancelDisconnect');
+    this.btnConfirmDisconnect = document.getElementById('btnConfirmDisconnect');
+    this.disconnectGameId = document.getElementById('disconnectGameId');
+
+    // Ranked panel & network warning
+    this.networkWarningBar = document.getElementById('networkWarningBar');
+    this.networkWarningMsg = document.getElementById('networkWarningMsg');
+    this.btnSwitchNetwork  = document.getElementById('btnSwitchNetwork');
+    this.operatorBadge     = document.getElementById('operatorBadge');
     this.rankedPanel      = document.getElementById('rankedPanel');
     this.rankedFeeDisplay = document.getElementById('rankedFeeDisplay');
     this.rankedStatusMsg  = document.getElementById('rankedStatusMsg');
@@ -246,7 +261,63 @@ class ConnectFourApp {
       });
     });
 
-    this.btnConnectWallet.addEventListener('click', () => this.connectWallet());
+    this.btnConnectWallet.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (this.walletAddress) {
+        this.toggleWalletMenu();
+      } else {
+        this.openWalletModal();
+      }
+    });
+
+    // Close wallet menu when clicking outside
+    document.addEventListener('click', (e) => {
+      if (this.walletMenu && this.walletMenu.style.display === 'flex') {
+        const container = document.querySelector('.wallet-control-container');
+        if (container && !container.contains(e.target)) {
+          this.closeWalletMenu();
+        }
+      }
+    });
+
+    if (this.btnCopyAddress) {
+      this.btnCopyAddress.addEventListener('click', () => this.handleCopyAddress());
+    }
+    if (this.btnSwitchWallet) {
+      this.btnSwitchWallet.addEventListener('click', () => {
+        this.closeWalletMenu();
+        this.openWalletModal();
+      });
+    }
+    if (this.btnDisconnectWallet) {
+      this.btnDisconnectWallet.addEventListener('click', () => {
+        this.closeWalletMenu();
+        this.promptDisconnect();
+      });
+    }
+
+    if (this.btnCloseWalletModal) {
+      this.btnCloseWalletModal.addEventListener('click', () => this.closeWalletModal());
+    }
+    if (this.walletModal) {
+      this.walletModal.addEventListener('click', (e) => {
+        if (e.target === this.walletModal) this.closeWalletModal();
+      });
+    }
+
+    if (this.btnCloseDisconnectWarning) {
+      this.btnCloseDisconnectWarning.addEventListener('click', () => this.closeDisconnectWarning());
+    }
+    if (this.btnCancelDisconnect) {
+      this.btnCancelDisconnect.addEventListener('click', () => this.closeDisconnectWarning());
+    }
+    if (this.btnConfirmDisconnect) {
+      this.btnConfirmDisconnect.addEventListener('click', () => this.executeDisconnect());
+    }
+
+    if (this.btnSwitchNetwork) {
+      this.btnSwitchNetwork.addEventListener('click', () => this.switchNetwork());
+    }
 
     // Verification modal
     this.btnInspectMove.addEventListener('click', () => this.openVerificationModal());
@@ -299,6 +370,8 @@ class ConnectFourApp {
     this.rankedStatPill.style.display = 'inline-flex';
     this.btnConnectWallet.style.display = 'inline-block';
     this.updateWeekDisplay();
+    this.checkNetwork();
+    this.checkOperatorHealth();
     if (!this.walletAddress) {
       this.rankedStatusMsg.textContent = 'Connect wallet to start';
     }
@@ -309,47 +382,229 @@ class ConnectFourApp {
     this.rankedPanel.style.display = 'none';
     this.rankedStatPill.style.display = 'none';
     this.btnConnectWallet.style.display = 'none';
+    if (this.networkWarningBar) this.networkWarningBar.style.display = 'none';
     this.isRankedGame = false;
     this.rankedGameId = null;
   }
 
-  async connectWallet() {
-    if (!window.ethereum) {
-      alert('No wallet found. Please install MetaMask or another EIP-1193 wallet.');
+  async checkNetwork() {
+    if (!this.wallet.chosenProvider) return true;
+    try {
+      const currentChainId = await this.wallet.getChainId();
+      const expectedChainId = CFG.chainId || 196;
+
+      if (currentChainId !== expectedChainId) {
+        if (this.networkWarningBar) {
+          this.networkWarningBar.style.display = 'flex';
+          this.networkWarningMsg.textContent = `⚠️ Wrong Network: Connected to chain ${currentChainId}. Please switch to X Layer (Chain ID ${expectedChainId}).`;
+        }
+        if (this.gameMode === 'ranked') {
+          this.rankedStatusMsg.textContent = 'Wrong network — please switch to X Layer';
+        }
+        return false;
+      } else {
+        if (this.networkWarningBar) {
+          this.networkWarningBar.style.display = 'none';
+        }
+        return true;
+      }
+    } catch (e) {
+      console.warn('checkNetwork error:', e);
+      return true;
+    }
+  }
+
+  async switchNetwork() {
+    if (!this.wallet.chosenProvider) return;
+    try {
+      await this.wallet.switchChain(CFG.chainId || 196, CFG.rpcUrl || 'https://rpc.xlayer.tech');
+      await this.checkNetwork();
+    } catch (switchErr) {
+      console.error('Failed to switch network:', switchErr);
+    }
+  }
+
+  handleChainChanged(chainId) {
+    console.log('Chain changed to:', chainId);
+    this.checkNetwork();
+  }
+
+  handleAccountsChanged(accounts) {
+    if (!accounts || accounts.length === 0) {
+      this.executeDisconnect();
+    } else {
+      this.walletAddress = accounts[0];
+      this.btnConnectWallet.textContent = `${this.walletAddress.slice(0, 6)}…${this.walletAddress.slice(-4)}`;
+      if (this.linkViewExplorer) {
+        this.linkViewExplorer.href = `https://www.oklink.com/xlayer/address/${this.walletAddress}`;
+      }
+      this.checkNetwork();
+    }
+  }
+
+  // ---- Wallet UI & Management (EIP-6963) -----------------------------------
+  toggleWalletMenu() {
+    if (!this.walletMenu) return;
+    const isShowing = this.walletMenu.style.display === 'flex';
+    this.walletMenu.style.display = isShowing ? 'none' : 'flex';
+  }
+
+  closeWalletMenu() {
+    if (this.walletMenu) this.walletMenu.style.display = 'none';
+  }
+
+  handleCopyAddress() {
+    if (!this.walletAddress) return;
+    navigator.clipboard.writeText(this.walletAddress).then(() => {
+      if (this.copyAddressText) {
+        this.copyAddressText.textContent = 'Copied!';
+        setTimeout(() => {
+          if (this.copyAddressText) this.copyAddressText.textContent = 'Copy address';
+        }, 1500);
+      }
+    }).catch(err => {
+      console.warn('Copy failed:', err);
+    });
+  }
+
+  openWalletModal() {
+    this.closeWalletMenu();
+    this.renderWalletList();
+    if (this.walletModal) this.walletModal.classList.add('active');
+  }
+
+  closeWalletModal() {
+    if (this.walletModal) this.walletModal.classList.remove('active');
+  }
+
+  renderWalletList() {
+    if (!this.walletList) return;
+    this.walletList.innerHTML = '';
+    const wallets = this.wallet.getDiscoveredWallets();
+
+    if (wallets.length === 0) {
+      if (this.noWalletsMessage) this.noWalletsMessage.style.display = 'block';
       return;
     }
-    try {
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-      this.walletAddress = accounts[0];
-      // Switch to X Layer
-      try {
-        await window.ethereum.request({
-          method: 'wallet_switchEthereumChain',
-          params: [{ chainId: '0xc4' }], // 196 = 0xc4
-        });
-      } catch (switchErr) {
-        if (switchErr.code === 4902) {
-          await window.ethereum.request({
-            method: 'wallet_addEthereumChain',
-            params: [{
-              chainId: '0xc4',
-              chainName: 'X Layer Mainnet',
-              nativeCurrency: { name: 'OKB', symbol: 'OKB', decimals: 18 },
-              rpcUrls: ['https://rpc.xlayer.tech'],
-              blockExplorerUrls: ['https://www.oklink.com/xlayer'],
-            }],
-          });
-        }
+
+    if (this.noWalletsMessage) this.noWalletsMessage.style.display = 'none';
+
+    for (const w of wallets) {
+      const btn = document.createElement('button');
+      btn.className = 'wallet-item';
+      btn.dataset.rdns = w.info.rdns || '';
+
+      const left = document.createElement('div');
+      left.className = 'wallet-item-left';
+
+      if (w.info.icon) {
+        const img = document.createElement('img');
+        img.className = 'wallet-icon';
+        img.src = w.info.icon;
+        img.alt = w.info.name;
+        img.onerror = () => {
+          img.replaceWith(this.createFallbackIcon());
+        };
+        left.appendChild(img);
+      } else {
+        left.appendChild(this.createFallbackIcon());
       }
+
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'wallet-name';
+      nameSpan.textContent = w.info.name;
+      left.appendChild(nameSpan);
+
+      btn.appendChild(left);
+
+      if (w.isLastUsed) {
+        const right = document.createElement('div');
+        right.className = 'wallet-item-right';
+        const badge = document.createElement('span');
+        badge.className = 'last-used-badge';
+        badge.textContent = 'Last used';
+        right.appendChild(badge);
+        btn.appendChild(right);
+      }
+
+      btn.addEventListener('click', () => this.handleSelectWallet(w));
+      this.walletList.appendChild(btn);
+    }
+  }
+
+  createFallbackIcon() {
+    const el = document.createElement('div');
+    el.className = 'wallet-icon-fallback';
+    el.innerHTML = '⚡';
+    return el;
+  }
+
+  async handleSelectWallet(walletDetail) {
+    this.closeWalletModal();
+    this.rankedStatusMsg.textContent = `Connecting to ${walletDetail.info.name}...`;
+
+    try {
+      const result = await this.wallet.connect(walletDetail);
+      this.walletAddress = result.address;
       this.sessionKeyAddr = await getSessionKeyAddress(this.walletAddress);
+
+      // Update UI
       this.btnConnectWallet.textContent = `${this.walletAddress.slice(0, 6)}…${this.walletAddress.slice(-4)}`;
-      this.rankedStatusMsg.textContent = 'Wallet connected — click New Game to start';
-      // Load ranked fee from contract
+      if (this.linkViewExplorer) {
+        this.linkViewExplorer.href = `https://www.oklink.com/xlayer/address/${this.walletAddress}`;
+      }
+      this.rankedStatusMsg.textContent = `Connected with ${walletDetail.info.name} — click New Game to start`;
+
+      await this.checkNetwork();
       await this.loadRankedFee();
+      await this.checkOperatorHealth();
     } catch (err) {
       console.error('Wallet connect error:', err);
-      this.rankedStatusMsg.textContent = 'Wallet connection failed';
+      if (err.isUserRejection) {
+        this.rankedStatusMsg.textContent = 'Connection canceled in wallet';
+      } else {
+        this.rankedStatusMsg.textContent = `Connection failed: ${err.message}`;
+      }
     }
+  }
+
+  promptDisconnect() {
+    this.closeWalletMenu();
+    if (this.isRankedGame && !this.isGameOver) {
+      if (this.disconnectGameId) {
+        this.disconnectGameId.textContent = `#${this.rankedGameId ?? '—'}`;
+      }
+      if (this.disconnectWarningModal) {
+        this.disconnectWarningModal.classList.add('active');
+      }
+    } else {
+      this.executeDisconnect();
+    }
+  }
+
+  closeDisconnectWarning() {
+    if (this.disconnectWarningModal) {
+      this.disconnectWarningModal.classList.remove('active');
+    }
+  }
+
+  async executeDisconnect() {
+    this.closeDisconnectWarning();
+    await this.wallet.disconnect();
+
+    this.walletAddress = null;
+    this.btnConnectWallet.textContent = 'Connect Wallet';
+    this.rankedStatusMsg.textContent = 'Wallet disconnected — connect wallet to start';
+
+    if (this.networkWarningBar) this.networkWarningBar.style.display = 'none';
+    if (this.operatorBadge) {
+      this.operatorBadge.className = 'operator-badge';
+      this.operatorBadge.style.display = 'none';
+    }
+  }
+
+  async sendRankedTx(to, data, value = '0x0', gasLimit = null) {
+    return this.wallet.sendTransaction({ to, data, value }, gasLimit);
   }
 
   async loadRankedFee() {
@@ -366,11 +621,18 @@ class ConnectFourApp {
     }
   }
 
-  openRankedStartModal() {
+  async openRankedStartModal() {
     if (!this.walletAddress) {
-      alert('Please connect your wallet first.');
+      this.openWalletModal();
       return;
     }
+    const isCorrectNetwork = await this.checkNetwork();
+    if (!isCorrectNetwork) {
+      await this.switchNetwork();
+      const ok = await this.checkNetwork();
+      if (!ok) return;
+    }
+    await this.checkOperatorHealth();
     this.rankedStartModal.classList.add('active');
   }
 
@@ -382,6 +644,12 @@ class ConnectFourApp {
     this.closeRankedModal();
     if (!this.walletAddress || !CFG.contractAddress) return;
 
+    const isCorrectNetwork = await this.checkNetwork();
+    if (!isCorrectNetwork) {
+      alert('Wrong network. Please switch to X Layer (Chain ID 196) before starting.');
+      return;
+    }
+
     this.rankedStatusMsg.textContent = 'Sending startRanked tx...';
     this.rankedTxPanel.style.display = 'flex';
     this.rankedTxStatus.textContent = 'pending';
@@ -391,12 +659,18 @@ class ConnectFourApp {
       const data = '0x5d4d794d' + encodeAddress(this.sessionKeyAddr);
       const value = '0x' + (this.rankedFee ?? 1_000_000_000_000_000n).toString(16);
 
-      const txHash = await sendRankedTx(this.walletAddress, CFG.contractAddress, data, value);
+      // Explicit gas limit (300,000 gas) to avoid simulation 403 in extension wallets
+      const txHash = await this.sendRankedTx(
+        CFG.contractAddress,
+        data,
+        value,
+        CFG.startRankedGas || 300000
+      );
       this.showTx(txHash);
 
       const rc = await waitForReceipt(txHash);
       if (rc.status !== '0x1') {
-        this.rankedStatusMsg.textContent = 'startRanked failed!';
+        this.rankedStatusMsg.textContent = 'startRanked failed on-chain!';
         this.rankedTxStatus.textContent = 'failed';
         return;
       }
@@ -427,8 +701,16 @@ class ConnectFourApp {
       this.startNewGame(true);
     } catch (err) {
       console.error('startRanked error:', err);
-      this.rankedStatusMsg.textContent = `Error: ${err.message}`;
-      this.rankedTxStatus.textContent = 'error';
+      if (err.isUserRejection) {
+        this.rankedStatusMsg.textContent = 'Transaction was canceled in your wallet.';
+        this.rankedTxStatus.textContent = 'canceled';
+      } else if (err.isSimulationError) {
+        this.rankedStatusMsg.textContent = err.message;
+        this.rankedTxStatus.textContent = 'simulation error';
+      } else {
+        this.rankedStatusMsg.textContent = `Transaction failed: ${err.message}`;
+        this.rankedTxStatus.textContent = 'failed';
+      }
     }
   }
 
@@ -448,7 +730,12 @@ class ConnectFourApp {
     try {
       // Encode playMove(uint256 gameId, uint8 col)
       const data = '0x2bb86dd3' + encodeUint256(this.rankedGameId) + encodeUint256(col);
-      const txHash = await sendRankedTx(this.walletAddress, CFG.contractAddress, data);
+      const txHash = await this.sendRankedTx(
+        CFG.contractAddress,
+        data,
+        '0x0',
+        CFG.estimatedMoveGas || 3450000
+      );
       this.showTx(txHash);
 
       const rc = await waitForReceipt(txHash);
@@ -462,8 +749,16 @@ class ConnectFourApp {
       return true;
     } catch (err) {
       console.error('Ranked move error:', err);
-      this.rankedStatusMsg.textContent = `Move error: ${err.message}`;
-      this.rankedTxStatus.textContent = 'error';
+      if (err.isUserRejection) {
+        this.rankedStatusMsg.textContent = 'Move canceled in wallet.';
+        this.rankedTxStatus.textContent = 'canceled';
+      } else if (err.isSimulationError) {
+        this.rankedStatusMsg.textContent = err.message;
+        this.rankedTxStatus.textContent = 'simulation error';
+      } else {
+        this.rankedStatusMsg.textContent = `Move error: ${err.message}`;
+        this.rankedTxStatus.textContent = 'error';
+      }
       return false;
     }
   }
@@ -666,19 +961,30 @@ class ConnectFourApp {
     if (!CFG.contractAddress || this.rankedGameId === null) return;
     this.rankedStatusMsg.textContent = 'Waiting for bot operator move...';
     const botTurnStartTime = Date.now();
+    const botTimeoutMs = (CFG.botTimeoutSec ? CFG.botTimeoutSec * 1000 : 600000);
 
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 240; i++) {
       if (this.isGameOver) return;
       await new Promise(r => setTimeout(r, 3000));
 
       const elapsed = Date.now() - botTurnStartTime;
       if (elapsed > 20000 && this.botTimeoutBar) {
         this.botTimeoutBar.style.display = 'flex';
-        this.botTimeoutMsg.textContent = '⏳ Bot operator is taking time to respond. If inactive for > 10m, full refund can be claimed.';
+        this.botTimeoutMsg.textContent = '⏳ Bot operator seems delayed or offline. Waiting for move... (Refund available if inactive for 10m)';
+        this.rankedStatusMsg.textContent = 'Bot operator seems offline or slow... waiting for on-chain move.';
+        if (this.operatorBadge) {
+          this.operatorBadge.className = 'operator-badge checking';
+          this.operatorBadge.textContent = 'Operator: Delayed...';
+        }
       }
-      if (elapsed >= (CFG.botTimeoutSec ? CFG.botTimeoutSec * 1000 : 600000) && this.btnClaimBotRefund) {
+      if (elapsed >= botTimeoutMs && this.btnClaimBotRefund) {
         this.btnClaimBotRefund.style.display = 'inline-block';
-        this.botTimeoutMsg.textContent = '⚠️ Bot timeout expired (10m). You can now claim your 100% ranked fee refund.';
+        this.botTimeoutMsg.textContent = '🚨 Bot operator is offline (10m timeout reached). You can now claim your 100% refund!';
+        this.rankedStatusMsg.textContent = 'Operator offline — 100% refund available.';
+        if (this.operatorBadge) {
+          this.operatorBadge.className = 'operator-badge offline';
+          this.operatorBadge.textContent = 'Operator: Offline';
+        }
       }
 
       try {
@@ -739,7 +1045,7 @@ class ConnectFourApp {
         console.warn('watchForBotMove poll error:', e);
       }
     }
-    this.rankedStatusMsg.textContent = 'Bot move timeout — please check the game on-chain.';
+    this.rankedStatusMsg.textContent = 'Bot move timeout — operator is offline. You can claim a refund.';
     if (this.btnClaimBotRefund) this.btnClaimBotRefund.style.display = 'inline-block';
   }
 
@@ -749,7 +1055,12 @@ class ConnectFourApp {
       this.btnClaimBotRefund.disabled = true;
       this.botTimeoutMsg.textContent = 'Submitting refund transaction...';
       const data = '0xa480fae6' + encodeUint256(this.rankedGameId);
-      const txHash = await sendRankedTx(this.walletAddress, CFG.contractAddress, data);
+      const txHash = await this.sendRankedTx(
+        CFG.contractAddress,
+        data,
+        '0x0',
+        CFG.timeoutRefundGas || 200000
+      );
       this.rankedTxLink.href = `${CFG.explorerBase || 'https://www.oklink.com/xlayer/tx/'}${txHash}`;
       this.rankedTxLink.textContent = `${txHash.slice(0, 10)}...`;
       this.rankedTxPanel.style.display = 'flex';
@@ -763,7 +1074,13 @@ class ConnectFourApp {
       this.updatePickersAvailability();
     } catch (err) {
       console.error('Claim refund failed:', err);
-      this.botTimeoutMsg.textContent = `Refund failed: ${err.message}`;
+      if (err.isUserRejection) {
+        this.botTimeoutMsg.textContent = 'Refund transaction canceled in wallet.';
+      } else if (err.isSimulationError) {
+        this.botTimeoutMsg.textContent = err.message;
+      } else {
+        this.botTimeoutMsg.textContent = `Refund failed: ${err.message}`;
+      }
       this.btnClaimBotRefund.disabled = false;
     }
   }
@@ -825,12 +1142,16 @@ class ConnectFourApp {
     if (!this.lastVerification) return;
     const v = this.lastVerification;
 
+    const gateCount = CFG.gateCount || 1479;
     const srcLabel = v.source === 'on-chain'
       ? 'on-chain (X Layer TapeOut circuit)'
-      : 'local circuit simulation (1,356 NAND Gates)';
+      : `local circuit simulation (${gateCount} NAND Gates)`;
     this.modalSource.textContent = srcLabel;
     this.modalInputHex.textContent  = v.rawInputHex;
     this.modalOutputHex.textContent = v.rawOutputHex;
+
+    const modalGateEl = document.getElementById('modalGateCount');
+    if (modalGateEl) modalGateEl.textContent = gateCount.toString();
 
     this.modalInputBreakdown.innerHTML = `
       <div class="bit-row"><span>Chosen Column:</span> <b>Col ${v.col}</b> (bits 84-86)</div>

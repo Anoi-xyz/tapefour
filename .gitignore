@@ -4,6 +4,7 @@ cache/
 out/
 typechain-types/
 scripts/c4_netlist.bin
+tapeout.state.json
 .env
 .env.*
 !.env.example
