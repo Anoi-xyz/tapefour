@@ -55,6 +55,8 @@ Every ranked move is validated directly by a **1,479 NAND gate** combinational c
 
 4. **Web Application (`web/`)**:
    * Pure static HTML5, CSS3, and ES modules (zero framework overhead, zero build step).
+   * Published directly from the `web/` folder: `index.html` is the self-contained interactive landing page, and `game.html` is the playable Connect Four game (`game.html#ranked` opens directly into on-chain ranked mode).
+   * EIP-6963 multi-wallet picker (MetaMask, OKX, Rabby, Zerion, etc.) with explicit gas enforcement and safe disconnect.
    * Truthful verification badges: explicitly indicates whether each move was verified via "local circuit simulation" or "on-chain (TapeOut circuit)".
 
 ---
@@ -132,11 +134,17 @@ npx tsx scripts/read_contract.ts
 With smart contracts and processor circuits permanently deployed on X Layer, the remaining hosting tasks are:
 
 ### 1. Static Web Application (`web/`)
-The front-end is 100% static HTML/CSS/ES modules. `web/config.js` is already wired to the live contract and public RPC (`https://rpc.xlayer.tech`).
-* **Deploy**: Upload `web/` to any static host (Cloudflare Pages, Vercel, Netlify, GitHub Pages, or VPS nginx/caddy).
-* **Local Preview**:
+The front-end is 100% static HTML/CSS/ES modules with zero build step. Publish the `web/` folder to any static host:
+* `index.html`: The interactive 3D landing page introducing the game and the on-chain circuit.
+* `game.html`: The full Connect Four game application. Navigating to `game.html#ranked` directly opens Ranked (On-Chain) mode; plain `game.html` opens casual mode.
+* `web/config.js` is already wired to the live contract (`0x1c319c3bcb9ed1c35507f029c8e7152ab0590c04`) and public RPC (`https://rpc.xlayer.tech`).
+
+* **Deploy**: Publish the `web/` directory on any static host (Cloudflare Pages, Vercel, Netlify, GitHub Pages, or VPS nginx/caddy).
+* **Local Development Server**:
   ```bash
-  npx serve web -p 3000
+  npm start
+  # or: node serve.js
+  # Serves / as index.html (landing page) and /game.html as game.html
   ```
 
 ### 2. Autonomous Bot Operator Service (`bot/`)

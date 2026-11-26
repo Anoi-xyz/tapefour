@@ -112,7 +112,7 @@ class ConnectFourApp {
     this.initWorker();
     this.bindEvents();
     this.checkRankedConfig();
-    this.startNewGame();
+    this.handleHashChange(true);
   }
 
   checkRankedConfig() {
@@ -235,12 +235,20 @@ class ConnectFourApp {
       this.gameMode = e.target.value;
       this.diffGroup.style.display = (this.gameMode === 'two-human' || this.gameMode === 'ranked') ? 'none' : 'flex';
       if (this.gameMode === 'ranked') {
+        if (window.location.hash.toLowerCase() !== '#ranked') {
+          window.location.hash = 'ranked';
+        }
         this.enterRankedMode();
       } else {
+        if (window.location.hash.toLowerCase() === '#ranked') {
+          history.replaceState(null, '', window.location.pathname + window.location.search);
+        }
         this.exitRankedMode();
         this.startNewGame();
       }
     });
+
+    window.addEventListener('hashchange', () => this.handleHashChange());
 
     this.selectDifficulty.addEventListener('change', (e) => {
       this.difficulty = e.target.value;
@@ -349,6 +357,26 @@ class ConnectFourApp {
   }
 
   // ---- Ranked mode --------------------------------------------------------
+
+  handleHashChange(isInitial = false) {
+    const hash = (window.location.hash || '').toLowerCase();
+    if (hash === '#ranked') {
+      if (this.gameMode !== 'ranked' || isInitial) {
+        this.gameMode = 'ranked';
+        if (this.selectMode) this.selectMode.value = 'ranked';
+        if (this.diffGroup) this.diffGroup.style.display = 'none';
+        this.enterRankedMode();
+      }
+    } else {
+      if (this.gameMode === 'ranked' || isInitial) {
+        this.gameMode = 'human-vs-bot';
+        if (this.selectMode) this.selectMode.value = 'human-vs-bot';
+        if (this.diffGroup) this.diffGroup.style.display = 'flex';
+        this.exitRankedMode();
+        this.startNewGame();
+      }
+    }
+  }
 
   getWeekNumber() {
     const nowSec = Math.floor(Date.now() / 1000);

@@ -18,12 +18,13 @@ const MIME_TYPES = {
   '.svg': 'image/svg+xml',
 };
 
-const PORT = process.env.PORT || 3000;
+let currentPort = Number(process.env.PORT) || 3000;
 
 const server = http.createServer((req, res) => {
-  // Normalize URL
-  let reqPath = req.url.split('?')[0];
+  // Normalize URL (strip query parameters and client fragments)
+  let reqPath = req.url.split('?')[0].split('#')[0];
   if (reqPath === '/' || reqPath === '') reqPath = '/index.html';
+  if (reqPath === '/game') reqPath = '/game.html';
 
   const filePath = path.join(WEB_DIR, reqPath);
 
@@ -54,7 +55,24 @@ const server = http.createServer((req, res) => {
   });
 });
 
-server.listen(PORT, '127.0.0.1', () => {
-  console.log(`TapeFour web server running at http://localhost:${PORT}/`);
-  console.log(`Serving static files from: ${WEB_DIR}`);
+function startServer(port) {
+  server.removeAllListeners('listening');
+  server.listen(port, '127.0.0.1', () => {
+    const address = server.address();
+    const actualPort = (address && typeof address === 'object') ? address.port : port;
+    console.log(`TapeFour web server running at http://localhost:${actualPort}/`);
+    console.log(`Serving static files from: ${WEB_DIR}`);
+  });
+}
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE' && !process.env.PORT && currentPort < 3010) {
+    currentPort += 1;
+    console.warn(`Port in use, trying port ${currentPort}...`);
+    startServer(currentPort);
+  } else {
+    throw err;
+  }
 });
+
+startServer(currentPort);
