@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>TapeFour · glass preview</title>
+<style>
+:root{--ink:#eaf6f6;--mut:rgba(234,246,246,.58);--aqua:#7ddfd0;--d1:#ff6b81;--d2:#ffd37a;--glass:rgba(255,255,255,.07);--edge:rgba(255,255,255,.16);--hair:rgba(255,255,255,.1)}
+*{box-sizing:border-box;margin:0}
+body{min-height:100vh;color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;background:#04141a}
+.orbs{position:fixed;inset:0;z-index:0;overflow:hidden;background:linear-gradient(160deg,#04141a,#06222a 55%,#0a1a1e)}
+.orbs i{position:absolute;border-radius:50%;filter:blur(70px);opacity:.7;animation:dr 18s ease-in-out infinite alternate}
+.orbs i:nth-child(1){width:46vmax;height:46vmax;left:-12vmax;top:-10vmax;background:#12a898}
+.orbs i:nth-child(2){width:38vmax;height:38vmax;right:-10vmax;top:18vh;background:#e8566f;animation-delay:-6s}
+.orbs i:nth-child(3){width:34vmax;height:34vmax;left:22vw;bottom:-18vmax;background:#d99a45;animation-delay:-11s}
+@keyframes dr{to{transform:translate(4vmax,-3vmax) scale(1.1)}}
+.glass{background:var(--glass);border:1px solid var(--edge);border-radius:22px;backdrop-filter:blur(22px) saturate(140%);-webkit-backdrop-filter:blur(22px) saturate(140%);box-shadow:0 24px 50px -24px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.18)}
+@supports not (backdrop-filter:blur(1px)){.glass{background:rgba(14,38,44,.92)}}
+.app{position:relative;z-index:1;max-width:520px;margin:0 auto;padding:max(18px,env(safe-area-inset-top)) 16px 40px}
+.top{display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:14px;border-radius:18px}
+.back{color:var(--mut);font-size:13px;cursor:pointer;padding:6px 8px;border-radius:10px}.back:hover{background:rgba(255,255,255,.08);color:var(--ink)}
+.logo{font-size:20px;letter-spacing:-.03em}.logo span{color:var(--aqua)}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid var(--hair);font-size:12px;color:var(--mut);white-space:nowrap}
+.chip i{width:7px;height:7px;border-radius:50%;background:var(--aqua);box-shadow:0 0 8px var(--aqua)}
+.sp{flex:1}
+.pill{padding:9px 16px;border-radius:999px;border:1px solid var(--edge);background:rgba(255,255,255,.09);color:var(--ink);font:600 14px system-ui;cursor:pointer}
+.pill:hover{background:rgba(255,255,255,.15)}
+.pill.pri{background:var(--aqua);border-color:var(--aqua);color:#04201f}.pill.pri:hover{background:#9bece0}
+.card{padding:20px}
+.row{display:flex;align-items:center;gap:12px;justify-content:space-between}
+.lab{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}
+.seg{display:flex;padding:4px;margin-top:8px;border-radius:14px;background:rgba(0,0,0,.24)}
+.seg button{flex:1;padding:9px 10px;border:0;border-radius:10px;background:none;color:var(--mut);font:600 14px system-ui;cursor:pointer}
+.seg button.on{background:rgba(255,255,255,.15);color:var(--ink)}
+select{padding:8px 12px;border-radius:12px;border:1px solid var(--edge);background:rgba(255,255,255,.08);color:var(--ink);font:500 14px system-ui}
+select option{color:#04201f}
+.sep{height:1px;background:var(--hair);margin:16px 0}
+.rk{display:none;gap:8px;flex-wrap:wrap;align-items:center}.rk.on{display:flex}
+.turn{display:flex;align-items:center;gap:10px}.turn b{font-size:18px;font-weight:650;letter-spacing:-.01em}
+.dot{width:14px;height:14px;border-radius:50%;background:var(--d1)}
+.board{margin-top:14px;padding:12px;border-radius:20px;background:rgba(0,0,0,.2);border:1px solid var(--hair);display:grid;grid-template-columns:repeat(7,1fr);gap:8px;cursor:pointer;user-select:none}
+.cell{aspect-ratio:1;border-radius:50%;background:rgba(2,12,14,.55);box-shadow:inset 0 3px 7px rgba(0,0,0,.55),0 1px 0 rgba(255,255,255,.08);transition:background .2s}
+.cell:hover{background:rgba(255,255,255,.1)}
+.cell.p1{background:radial-gradient(circle at 35% 30%,#ff9fae,var(--d1) 62%)}
+.cell.p2{background:radial-gradient(circle at 35% 30%,#ffe7ac,var(--d2) 62%)}
+.cell.w{outline:3px solid var(--aqua);animation:pu .8s infinite alternate}@keyframes pu{to{transform:scale(1.1)}}
+.st{margin-top:12px;font-size:13px;color:var(--mut);min-height:20px}
+.vf{display:none;margin-top:12px;padding:12px 14px;border-radius:14px;background:rgba(0,0,0,.2);border:1px solid var(--hair);font-size:13px;color:var(--mut)}.vf.on{display:block}.vf b{color:var(--aqua)}
+.foot{display:flex;gap:10px;margin-top:16px}
+.ov{position:fixed;inset:0;z-index:5;display:none;place-items:center;background:rgba(2,10,12,.45);backdrop-filter:blur(6px)}.ov.on{display:grid}
+.mod{width:min(380px,92vw);padding:18px}
+.mod h3{font-size:18px;letter-spacing:-.01em}
+.wl{display:flex;align-items:center;gap:12px;width:100%;margin-top:10px;padding:11px 12px;border-radius:14px;border:1px solid var(--hair);background:rgba(255,255,255,.06);color:var(--ink);font:600 14px system-ui;cursor:pointer;text-align:left}
+.wl:hover{background:rgba(255,255,255,.14)}
+.wl em{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:13px;background:rgba(125,223,208,.2);color:var(--aqua)}
+.wl span{margin-left:auto;font-weight:500;font-size:12px;color:var(--mut)}
+.x{border:0;background:rgba(255,255,255,.1);color:var(--ink);width:30px;height:30px;border-radius:50%;cursor:pointer}
+.menu{display:none;position:absolute;right:16px;top:74px;z-index:4;width:200px;padding:6px}.menu.on{display:block}
+.menu button{display:block;width:100%;padding:10px 12px;border:0;border-radius:12px;background:none;color:var(--ink);font:500 14px system-ui;text-align:left;cursor:pointer}.menu button:hover{background:rgba(255,255,255,.12)}
+@media(max-width:480px){.top{flex-wrap:wrap}.card{padding:16px}}
+</style></head><body>
+<div class="orbs"><i></i><i></i><i></i></div>
+<div class="app">
+  <header class="top glass"><span class="back">← TapeFour</span><b class="logo">Tape<span>Four</span></b><span class="chip" id="mc">Casual</span><span class="sp"></span><button class="pill pri" id="wb">Connect wallet</button></header>
+  <div class="menu glass" id="menu"><button id="cp">Copy address</button><button id="sw">Switch wallet</button><button id="dc">Disconnect</button></div>
+  <main class="card glass">
+    <div class="lab">Mode</div>
+    <div class="seg" id="seg"><button class="on" data-m="0">Casual</button><button data-m="1">Two players</button><button data-m="2">Ranked</button></div>
+    <div class="sep"></div>
+    <div class="row"><span class="lab">Engine</span><select><option>Local circuit simulator</option><option>On-chain eval (X Layer)</option></select></div>
+    <div class="sep"></div>
+    <div class="rk" id="rk"><span class="chip">Entry 0.005 OKB</span><span class="chip">60% prize pool</span><span class="chip"><i></i>Operator online</span></div>
+    <div class="sep rkS" id="rkS" style="display:none"></div>
+    <div class="turn"><span class="dot" id="dot"></span><b id="tn">Your turn</b><span class="sp"></span><span class="chip">✓ Verified by circuit</span></div>
+    <div class="board" id="bd"></div>
+    <div class="st" id="st"></div>
+    <div class="vf" id="vf"><b>Circuit check:</b> move valid · no win yet · source: local simulation (demo)</div>
+    <div class="foot"><button class="pill" id="vb">Verify move</button><button class="pill" id="ng">New game</button></div>
+  </main>
+</div>
+<div class="ov" id="ov"><div class="mod glass"><div class="row"><h3>Connect a wallet</h3><button class="x" id="cx">×</button></div>
+  <button class="wl" data-n="Rabby"><em>R</em>Rabby Wallet<span>Detected</span></button>
+  <button class="wl" data-n="MetaMask"><em>M</em>MetaMask<span>Detected</span></button>
+  <button class="wl" data-n="OKX"><em>O</em>OKX Wallet<span>Detected</span></button>
+  <button class="wl" data-n="Zerion"><em>Z</em>Zerion<span>Detected</span></button>
+  <button class="wl" data-n="Bitget"><em>B</em>Bitget Wallet<span>Detected</span></button></div></div>
+<script>
+const $=s=>document.querySelector(s),R=6,C=7;let g,over,busy,turn,conn=false,mode=0;
+function init(){g=Array.from({length:R},()=>Array(C).fill(0));over=busy=false;render();say('Your turn',1);$('#st').textContent=mode===2&&!conn?'Connect a wallet to start a ranked game.':''}
+function say(t,p){$('#tn').textContent=t;$('#dot').style.background=p===2?'var(--d2)':'var(--d1)'}
+function render(w){const bd=$('#bd');bd.innerHTML='';for(let r=0;r<R;r++)for(let c=0;c<C;c++){const d=document.createElement('div');d.className='cell'+(g[r][c]?' p'+g[r][c]:'')+(w&&w.some(q=>q[0]===r&&q[1]===c)?' w':'');d.dataset.c=c;bd.appendChild(d)}}
+function drop(c,p){for(let r=R-1;r>=0;r--)if(!g[r][c]){g[r][c]=p;return r}return -1}
+function win(p){for(let r=0;r<R;r++)for(let c=0;c<C;c++)for(const q of[[0,1],[1,0],[1,1],[1,-1]]){const k=[];for(let i=0;i<4;i++){const y=r+q[0]*i,x=c+q[1]*i;if(y<0||y>=R||x<0||x>=C||g[y][x]!==p)break;k.push([y,x])}if(k.length===4)return k}return null}
+const full=()=>g[0].every(Boolean);
+function pick(){const ok=[0,1,2,3,4,5,6].filter(c=>!g[0][c]);for(const p of[2,1])for(const c of ok){const r=drop(c,p),w=win(p);g[r][c]=0;if(w)return c}ok.sort((a,b)=>Math.abs(a-3)-Math.abs(b-3)+Math.random()-.5);return ok[0]}
+$('#bd').addEventListener('click',e=>{const c=+e.target.dataset.c;if(over||busy||isNaN(c)||(mode===2&&!conn)||drop(c,turn||1)<0)return;
+  if(mode===1){const p=turn||1,w=win(p);render(w);if(w){over=true;say('Player '+p+' wins',p);return}turn=p===1?2:1;say(turn===1?'Red’s turn':'Gold’s turn',turn);return}
+  const w=win(1);render(w);if(w){over=true;say('You win',1);return}if(full()){over=true;say('Draw',1);return}
+  busy=true;say('Bot is thinking…',2);setTimeout(()=>{drop(pick(),2);const w2=win(2);render(w2);busy=false;if(w2){over=true;say('Bot wins',2);return}if(full()){over=true;say('Draw',1);return}say('Your turn',1)},500)});
+$('#seg').addEventListener('click',e=>{if(e.target.dataset.m===undefined)return;mode=+e.target.dataset.m;turn=1;
+  document.querySelectorAll('#seg button').forEach(b=>b.classList.toggle('on',+b.dataset.m===mode));
+  $('#mc').textContent=['Casual','Two players','Ranked'][mode];$('#rk').classList.toggle('on',mode===2);$('#rkS').style.display=mode===2?'block':'none';init()});
+$('#ng').onclick=()=>{turn=1;init()};$('#vb').onclick=()=>$('#vf').classList.toggle('on');
+const wb=$('#wb');
+wb.onclick=()=>{if(conn)$('#menu').classList.toggle('on');else $('#ov').classList.add('on')};
+$('#cx').onclick=()=>$('#ov').classList.remove('on');
+document.querySelectorAll('.wl').forEach(b=>b.onclick=()=>{conn=true;wb.textContent='0x3a…c91f';wb.classList.remove('pri');$('#ov').classList.remove('on');init()});
+$('#dc').onclick=()=>{conn=false;wb.textContent='Connect wallet';wb.classList.add('pri');$('#menu').classList.remove('on');init()};
+$('#sw').onclick=()=>{$('#menu').classList.remove('on');$('#ov').classList.add('on')};
+$('#cp').onclick=()=>$('#menu').classList.remove('on');
+turn=1;init();
+</script></body></html>

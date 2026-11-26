@@ -3,24 +3,28 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="theme-color" content="#050507">
+  <meta name="theme-color" content="#04141a">
   <title>TapeFour — Connect Four on TapeOut Circuits</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- Background Orbs -->
+  <div class="orbs" aria-hidden="true"><i></i><i></i><i></i></div>
+
   <div class="app-container">
     <!-- Header -->
-    <header class="app-header">
+    <header class="app-header glass">
       <div class="header-branding">
         <a href="index.html" class="back-link" title="TapeFour Home">← TapeFour</a>
         <h1 class="logo">Tape<span class="logo-accent">Four</span></h1>
-        <span class="version-tag" id="modeTag">Casual Mode</span>
+        <span class="chip" id="modeTag"><i></i>Casual Mode</span>
       </div>
+      <span class="sp"></span>
       <div class="header-actions">
         <!-- Wallet connect button & account menu (shown only in ranked mode) -->
         <div class="wallet-control-container">
-          <button id="btnConnectWallet" class="btn btn-accent" style="display:none">Connect Wallet</button>
-          <div class="wallet-menu" id="walletMenu" style="display:none">
+          <button id="btnConnectWallet" class="pill pri" style="display:none">Connect Wallet</button>
+          <div class="wallet-menu glass" id="walletMenu" style="display:none">
             <button class="wallet-menu-item" id="btnCopyAddress">
               <span class="menu-icon">📋</span> <span id="copyAddressText">Copy address</span>
             </button>
@@ -36,118 +40,135 @@
             </button>
           </div>
         </div>
-        <button id="btnNewGame" class="btn btn-secondary">New Game</button>
+        <button id="btnNewGame" class="pill">New Game</button>
       </div>
     </header>
 
-    <!-- Controls / Settings Bar -->
-    <div class="controls-bar">
-      <div class="control-group">
-        <label for="selectMode">Mode</label>
-        <select id="selectMode" class="dropdown">
+    <!-- Main Game Card -->
+    <main class="card glass">
+      <!-- Mode Segmented Control -->
+      <div class="mode-section">
+        <div class="lab">Mode</div>
+        <div class="seg" id="modeSegmented" role="group" aria-label="Game Mode">
+          <button type="button" class="on" data-val="human-vs-bot">Casual</button>
+          <button type="button" data-val="two-human">Two players</button>
+          <button type="button" data-val="ranked" id="rankedSegmentBtn" disabled>Ranked</button>
+        </div>
+        <!-- Native select retained for full app.js logic compatibility -->
+        <select id="selectMode" class="dropdown visually-hidden" aria-hidden="true" tabindex="-1">
           <option value="human-vs-bot">Human vs Bot (Casual)</option>
           <option value="two-human">Two Players (Local)</option>
           <option value="ranked" id="rankedOption" disabled>Ranked (On-Chain)</option>
         </select>
       </div>
-      <div class="control-group" id="diffGroup">
-        <label for="selectDifficulty">Difficulty</label>
-        <select id="selectDifficulty" class="dropdown">
-          <option value="easy">Easy (Depth 1)</option>
-          <option value="medium" selected>Medium (Depth 3)</option>
-          <option value="hard">Hard (Depth 5)</option>
-        </select>
-      </div>
-      <div class="control-group">
-        <label for="selectEngine">Engine</label>
-        <select id="selectEngine" class="dropdown">
-          <option value="local">Local Circuit Simulator</option>
-          <option value="onchain" id="onchainOption" disabled>On-Chain Eval (TapeOut)</option>
-        </select>
-      </div>
-    </div>
 
-    <!-- Wrong Network Warning Bar -->
-    <div class="network-warning-bar" id="networkWarningBar" style="display:none">
-      <span class="warning-msg" id="networkWarningMsg">⚠️ Wrong Network: TapeFour requires X Layer (Chain ID 196).</span>
-      <button id="btnSwitchNetwork" class="btn btn-warning-action">Switch to X Layer</button>
-    </div>
+      <div class="sep"></div>
 
-    <!-- Ranked Panel (hidden unless ranked mode is active) -->
-    <div class="ranked-panel" id="rankedPanel" style="display:none">
-      <div class="ranked-info">
-        <span class="ranked-label">🏆 Ranked Mode</span>
-        <span class="ranked-fee" id="rankedFeeDisplay">Fee: 0.005 OKB (60% Pool / 40% Treasury)</span>
-        <span class="operator-badge checking" id="operatorBadge">Operator: checking...</span>
-        <span class="ranked-status" id="rankedStatusMsg">Connect wallet to start</span>
-      </div>
-      <div class="ranked-tx" id="rankedTxPanel" style="display:none">
-        <span class="tx-label">Tx:</span>
-        <a id="rankedTxLink" href="#" target="_blank" class="tx-hash">—</a>
-        <span id="rankedTxStatus" class="tx-status">pending</span>
-      </div>
-      <div class="ranked-game-info" id="rankedGameInfo" style="display:none">
-        <span>Game ID: <b id="rankedGameId">—</b></span>
-        <span>Round: <b id="rankedWeekLabel">Week 1</b></span>
-        <span>Est. Move Gas: <b>~3.45M</b></span>
-        <span>Wins in <b id="rankedWinsWeekLabel">this week</b>: <b id="rankedWins">0</b></span>
-      </div>
-      <!-- Bot Timeout Warning & Refund Button -->
-      <div class="bot-timeout-bar" id="botTimeoutBar" style="display:none">
-        <span id="botTimeoutMsg" class="timeout-msg">⚠️ Bot has taken longer than usual.</span>
-        <button id="btnClaimBotRefund" class="btn btn-warning" style="display:none">Claim 100% Refund (Timeout)</button>
-      </div>
-    </div>
-
-    <!-- Status & Turn Indicator -->
-    <div class="status-panel">
-      <div class="turn-indicator">
-        <span class="player-dot dot-a" id="turnDot"></span>
-        <span class="status-text" id="statusMessage">Player A's Turn</span>
-      </div>
-      <!-- Verification Badge -->
-      <div class="verification-badge" id="verificationBadge">
-        <span class="badge-icon">⚡</span>
-        <span class="badge-label" id="badgeSource">Verified: local circuit simulation</span>
-        <button id="btnInspectMove" class="btn-inspect" title="Inspect Circuit Verification" style="display:none">Verify move</button>
-      </div>
-    </div>
-
-    <!-- Connect Four Board -->
-    <main class="board-container">
-      <!-- Column Drop Indicators (hover on desktop, click on mobile) -->
-      <div class="column-pickers" id="columnPickers">
-        <button class="col-picker" data-col="0">▼</button>
-        <button class="col-picker" data-col="1">▼</button>
-        <button class="col-picker" data-col="2">▼</button>
-        <button class="col-picker" data-col="3">▼</button>
-        <button class="col-picker" data-col="4">▼</button>
-        <button class="col-picker" data-col="5">▼</button>
-        <button class="col-picker" data-col="6">▼</button>
-      </div>
-
-      <!-- 7x6 Grid -->
-      <div class="board-frame" id="boardFrame">
-        <!-- Cells generated dynamically (row 5 at top, row 0 at bottom) -->
-      </div>
-    </main>
-
-    <!-- Score & Stats Footnote -->
-    <footer class="app-footer">
-      <div class="stats-row">
-        <div class="stat-pill"><span class="label">Circuit:</span> 1,479 NAND Gates</div>
-        <div class="stat-pill"><span class="label">Format:</span> TAP-02 Netlist</div>
-        <div class="stat-pill"><span class="label">Total Moves:</span> <span id="statMovesCount">0</span></div>
-        <div class="stat-pill" id="rankedStatPill" style="display:none">
-          <span class="label">Game:</span> <span id="statGameId">—</span>
+      <!-- Controls / Settings (Difficulty & Engine) -->
+      <div class="controls-bar">
+        <div class="control-group" id="diffGroup">
+          <label for="selectDifficulty" class="lab">Difficulty</label>
+          <select id="selectDifficulty" class="dropdown">
+            <option value="easy">Easy (Depth 1)</option>
+            <option value="medium" selected>Medium (Depth 3)</option>
+            <option value="hard">Hard (Depth 5)</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label for="selectEngine" class="lab">Engine</label>
+          <select id="selectEngine" class="dropdown">
+            <option value="local">Local Circuit Simulator</option>
+            <option value="onchain" id="onchainOption" disabled>On-Chain Eval (TapeOut)</option>
+          </select>
         </div>
       </div>
-    </footer>
+
+      <!-- Wrong Network Warning Bar -->
+      <div class="network-warning-bar" id="networkWarningBar" style="display:none">
+        <span class="warning-msg" id="networkWarningMsg">⚠️ Wrong Network: TapeFour requires X Layer (Chain ID 196).</span>
+        <button id="btnSwitchNetwork" class="btn btn-warning-action">Switch to X Layer</button>
+      </div>
+
+      <!-- Ranked Panel (hidden unless ranked mode is active) -->
+      <div class="ranked-panel" id="rankedPanel" style="display:none">
+        <div class="ranked-info">
+          <span class="ranked-label">🏆 Ranked Mode</span>
+          <span class="chip" id="rankedFeeDisplay">Fee: 0.005 OKB (60% Pool / 40% Treasury)</span>
+          <span class="chip operator-badge checking" id="operatorBadge"><i></i>Operator: checking...</span>
+          <span class="ranked-status" id="rankedStatusMsg">Connect wallet to start</span>
+        </div>
+        <div class="ranked-tx" id="rankedTxPanel" style="display:none">
+          <span class="tx-label">Tx:</span>
+          <a id="rankedTxLink" href="#" target="_blank" class="tx-hash">—</a>
+          <span id="rankedTxStatus" class="tx-status">pending</span>
+        </div>
+        <div class="ranked-game-info" id="rankedGameInfo" style="display:none">
+          <span>Game ID: <b id="rankedGameId">—</b></span>
+          <span>Round: <b id="rankedWeekLabel">Week 1</b></span>
+          <span>Est. Move Gas: <b>~3.45M</b></span>
+          <span>Wins in <b id="rankedWinsWeekLabel">this week</b>: <b id="rankedWins">0</b></span>
+        </div>
+        <!-- Bot Timeout Warning & Refund Button -->
+        <div class="bot-timeout-bar" id="botTimeoutBar" style="display:none">
+          <span id="botTimeoutMsg" class="timeout-msg">⚠️ Bot has taken longer than usual.</span>
+          <button id="btnClaimBotRefund" class="btn btn-warning" style="display:none">Claim 100% Refund (Timeout)</button>
+        </div>
+      </div>
+
+      <div class="sep"></div>
+
+      <!-- Turn & Status Bar -->
+      <div class="turn-bar" id="turnBar">
+        <div class="turn-indicator">
+          <span class="player-dot dot-a" id="turnDot"></span>
+          <b class="status-text" id="statusMessage">Player A's Turn</b>
+        </div>
+        <span class="sp"></span>
+        <div class="verification-badge" id="verificationBadge">
+          <span class="badge-icon">⚡</span>
+          <span class="badge-label" id="badgeSource">Verified: local circuit simulation</span>
+          <button id="btnInspectMove" class="btn-inspect" title="Inspect Circuit Verification" style="display:none">Verify move</button>
+        </div>
+      </div>
+
+      <!-- Connect Four Board -->
+      <div class="board-container">
+        <!-- Column Drop Indicators -->
+        <div class="column-pickers" id="columnPickers">
+          <button class="col-picker" data-col="0">▼</button>
+          <button class="col-picker" data-col="1">▼</button>
+          <button class="col-picker" data-col="2">▼</button>
+          <button class="col-picker" data-col="3">▼</button>
+          <button class="col-picker" data-col="4">▼</button>
+          <button class="col-picker" data-col="5">▼</button>
+          <button class="col-picker" data-col="6">▼</button>
+        </div>
+
+        <!-- 7x6 Grid Frame -->
+        <div class="board-frame" id="boardFrame">
+          <!-- Cells generated dynamically (row 5 at top, row 0 at bottom) -->
+        </div>
+      </div>
+
+      <div class="sep"></div>
+
+      <!-- Score & Stats Footnote -->
+      <footer class="app-footer">
+        <div class="stats-row">
+          <div class="stat-pill"><span class="label">Circuit:</span> 1,479 NAND Gates</div>
+          <div class="stat-pill"><span class="label">Format:</span> TAP-02 Netlist</div>
+          <div class="stat-pill"><span class="label">Total Moves:</span> <span id="statMovesCount">0</span></div>
+          <div class="stat-pill" id="rankedStatPill" style="display:none">
+            <span class="label">Game:</span> <span id="statGameId">—</span>
+          </div>
+        </div>
+      </footer>
+    </main>
   </div>
 
   <!-- Move Verification Modal -->
   <div class="modal-backdrop" id="modalBackdrop">
-    <div class="modal-card">
+    <div class="modal-card glass">
       <div class="modal-header">
         <h3 class="modal-title">Circuit Move Verification</h3>
         <button class="btn-close" id="btnCloseModal">&times;</button>
@@ -174,14 +195,14 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-primary" id="btnModalCloseAction">Close</button>
+        <button class="pill pri" id="btnModalCloseAction">Close</button>
       </div>
     </div>
   </div>
 
   <!-- Ranked: Start Ranked Game Modal -->
   <div class="modal-backdrop" id="rankedStartModal">
-    <div class="modal-card">
+    <div class="modal-card glass">
       <div class="modal-header">
         <h3 class="modal-title">🏆 Start Ranked Game</h3>
         <button class="btn-close" id="btnCloseRankedModal">&times;</button>
@@ -216,15 +237,15 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" id="btnCancelRanked">Cancel</button>
-        <button class="btn btn-accent" id="btnConfirmRanked">Pay & Start</button>
+        <button class="pill" id="btnCancelRanked">Cancel</button>
+        <button class="pill pri" id="btnConfirmRanked">Pay & Start</button>
       </div>
     </div>
   </div>
 
   <!-- Wallet Picker Modal (EIP-6963) -->
   <div class="modal-backdrop" id="walletModal">
-    <div class="modal-card wallet-modal-card">
+    <div class="modal-card wallet-modal-card glass">
       <div class="modal-header">
         <h3 class="modal-title">Connect a wallet</h3>
         <button class="btn-close" id="btnCloseWalletModal">&times;</button>
@@ -257,7 +278,7 @@
 
   <!-- Disconnect Active Game Warning Modal -->
   <div class="modal-backdrop" id="disconnectWarningModal">
-    <div class="modal-card">
+    <div class="modal-card glass">
       <div class="modal-header">
         <h3 class="modal-title">⚠️ Active Game Warning</h3>
         <button class="btn-close" id="btnCloseDisconnectWarning">&times;</button>
@@ -269,11 +290,49 @@
         </p>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" id="btnCancelDisconnect">Cancel</button>
+        <button class="pill" id="btnCancelDisconnect">Cancel</button>
         <button class="btn btn-warning" id="btnConfirmDisconnect">Disconnect Anyway</button>
       </div>
     </div>
   </div>
+
+  <!-- Mode Segmented Control <-> selectMode Synchronizer -->
+  <script>
+    (function() {
+      const sel = document.getElementById('selectMode');
+      const seg = document.getElementById('modeSegmented');
+      if (!sel || !seg) return;
+
+      seg.addEventListener('click', (e) => {
+        const btn = e.target.closest('button');
+        if (!btn || btn.disabled) return;
+        if (sel.value !== btn.dataset.val) {
+          sel.value = btn.dataset.val;
+          sel.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      });
+
+      function syncSeg() {
+        seg.querySelectorAll('button').forEach(b => {
+          b.classList.toggle('on', b.dataset.val === sel.value);
+        });
+        const rOpt = document.getElementById('rankedOption');
+        const rBtn = document.getElementById('rankedSegmentBtn');
+        if (rOpt && rBtn) {
+          rBtn.disabled = rOpt.disabled;
+        }
+      }
+
+      sel.addEventListener('change', syncSeg);
+
+      const rOpt = document.getElementById('rankedOption');
+      if (rOpt && window.MutationObserver) {
+        new MutationObserver(syncSeg).observe(rOpt, { attributes: true, attributeFilter: ['disabled'] });
+      }
+
+      syncSeg();
+    })();
+  </script>
 
   <!-- Unified Configuration for X Layer & TapeOut -->
   <script src="config.js"></script>

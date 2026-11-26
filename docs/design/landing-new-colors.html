@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>TapeFour: Connect Four, enforced by a circuit</title>
+<style>
+:root{--fg:#f4f4f6;--mut:#8b8b96;--acc:#ff8f7a;--vi:#7ddfd0;--line:#26262e}
+*{box-sizing:border-box;margin:0}
+html{scrollbar-width:none}body::-webkit-scrollbar{display:none}
+body{background:#04141a;color:var(--fg);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;overflow-x:hidden}
+a{color:inherit;text-decoration:none}.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,monospace}
+#cv{position:fixed;inset:0;z-index:1;pointer-events:none}
+[data-s]{opacity:var(--o,0);transform:translateY(calc((1 - var(--o,0)) * 24px));pointer-events:none}
+[data-s].on{pointer-events:auto}
+.nav{position:fixed;top:max(12px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:20;display:flex;align-items:center;gap:6px;padding:5px 6px 5px 12px;border:1px solid var(--line);border-radius:12px;background:rgba(15,15,20,.8);backdrop-filter:blur(12px);font-size:12px;white-space:nowrap}
+.nav a,.nav .clk,.pill{padding:6px 9px;border-radius:8px;color:var(--mut);cursor:pointer}
+.nav a:hover{color:var(--fg);background:#1b1b23}
+.pill{display:flex;align-items:center;gap:7px;background:#16161d;color:var(--fg);cursor:default}
+.pill i{width:7px;height:7px;border-radius:50%;background:#3dff8a;box-shadow:0 0 8px #3dff8a}
+.nav .cta{background:var(--acc);color:#0a0a0a;font-weight:700}
+.big{position:fixed;z-index:0;left:0;right:0;text-align:center;top:20vh;white-space:nowrap;font-size:8.7vw;line-height:1;letter-spacing:-.05em;font-weight:800;text-transform:uppercase;color:rgba(255,255,255,.55)}
+.lead{position:fixed;z-index:3;left:4vw;bottom:max(26px,env(safe-area-inset-bottom));max-width:min(500px,88vw)}
+.tag{display:inline-block;margin-bottom:12px;padding:4px 10px;border:1px solid var(--line);border-radius:7px;background:#111118;color:var(--mut);font-size:11px}
+.lead p{font-size:clamp(17px,2.1vw,22px);font-weight:600;line-height:1.25}.lead p em{display:block;font-style:normal;color:var(--mut)}
+.hint{position:fixed;z-index:3;right:4vw;bottom:max(26px,env(safe-area-inset-bottom));font-size:11px;color:var(--mut)}
+.frame{position:fixed;z-index:0;left:50%;top:52%;width:64vw;height:62vh;margin:-31vh 0 0 -32vw;border-radius:20px;background:#05161b;box-shadow:0 40px 80px -30px rgba(10,40,50,.5);transform:scale(calc(.9 + .1 * var(--o,0)))}
+.frame h3{position:absolute;top:7%;width:100%;text-align:center;font-size:clamp(15px,1.8vw,22px);font-weight:600;color:#fff}.frame h3 em{display:block;font-style:normal;color:var(--mut)}
+.card{position:fixed;z-index:3;padding:12px 14px;border-radius:12px;background:rgba(18,18,24,.92);border:1px solid #2a2a33;font-size:12px;color:#d6d6de;box-shadow:0 16px 40px -14px rgba(0,0,0,.6)}
+.card b{display:block;font-size:22px;letter-spacing:-.03em;color:var(--acc)}
+.ticks{display:flex;gap:3px;margin-top:8px}.ticks i{width:9px;height:18px;border-radius:2px;background:var(--vi)}.ticks i:last-child{background:var(--acc)}
+.pn{position:fixed;z-index:4;top:50%;width:min(420px,40vw);margin-top:-190px}
+.pl{left:6vw}.pr{right:6vw}
+.pn h2{font-size:clamp(26px,3.6vw,46px);line-height:1.04;letter-spacing:-.03em;margin-bottom:12px}.pn h2 em{font-style:normal;color:var(--mut)}
+.pn p,.pn li{color:#c4c4cd;font-size:16px}.pn ul{list-style:none;padding:0;margin:6px 0 16px}.pn li{padding:6px 0;border-bottom:1px solid #1d1d25}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0 12px}
+.chips button{padding:7px 14px;border-radius:8px;border:1px solid var(--line);background:#101016;color:var(--mut);font:600 13px system-ui;cursor:pointer}
+.chips button.on{background:var(--fg);color:#0a0a0a;border-color:var(--fg)}
+.mini{display:flex;gap:10px;margin-top:16px}.mini div{flex:1;padding:12px;border:1px solid var(--line);border-radius:12px;background:#0d0d12;font-size:12px;color:var(--mut)}
+.mini b{display:block;font-size:22px;letter-spacing:-.03em;color:var(--acc)}
+.btn{display:inline-block;padding:11px 18px;border-radius:10px;font-weight:700;font-size:14px;border:1px solid var(--line);background:#101016;color:var(--fg);cursor:pointer;margin:6px 8px 0 0}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#0a0a0a}
+.board{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;padding:10px;border-radius:16px;background:#14141c;border:1px solid #23232c;cursor:pointer;user-select:none;margin-top:14px}
+.cell{aspect-ratio:1;border-radius:50%;background:#070709;box-shadow:inset 0 3px 6px #000;transition:background .25s}
+.cell:hover{background:#15151d}.cell.p1{background:#ff6b81}.cell.p2{background:#ffd37a}
+.cell.w{outline:3px solid var(--acc);animation:pu .8s infinite alternate}@keyframes pu{to{transform:scale(1.12)}}
+.status{margin-top:10px;font-size:13px;color:var(--mut);min-height:20px}
+.links{margin-top:18px;display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--mut)}.links a:hover{color:var(--fg)}
+.fine{margin-top:12px;font-size:12px;color:#5d5d68}
+.cen{position:fixed;z-index:4;left:0;right:0;bottom:12vh;text-align:center}.cen h2{font-size:clamp(28px,5vw,60px);letter-spacing:-.04em;line-height:1}.cen p{color:var(--mut);margin-top:8px}
+@media(max-width:760px){.nav a:not(.cta){display:none}.pn{width:auto;left:5vw;right:5vw;top:auto;bottom:4vh;margin:0;padding:16px;border-radius:16px;background:rgba(8,8,12,.88);backdrop-filter:blur(8px)}.pn h2{font-size:26px}.card,.hint{display:none}.frame{width:90vw;margin-left:-45vw}.big{top:14vh}}
+</style></head><body>
+<nav class="nav mono"><span class="clk" id="clk">00:00:00</span><span class="pill"><i></i>Circuit live on X Layer</span>
+<a data-go="3">How it works</a><a data-go="4">Try it</a><a data-go="5">Ranked</a><a class="cta" href="game.html">Play now</a></nav>
+<canvas id="cv"></canvas>
+
+<div class="big mono" data-s="0">Hello, I’m TapeFour</div>
+<div class="lead" data-s="0"><span class="tag mono">Rules enforced on-chain · X Layer</span><p>TapeFour is Connect Four where the rules are a circuit.<em>It checks every move before it counts.</em></p></div>
+<div class="hint mono" data-s="0">scroll ↓ · move your cursor</div>
+
+<div class="frame" data-s="1"><h3>Rules you can verify,<em>in one quiet place.</em></h3></div>
+<div class="card mono" data-s="1" style="left:7vw;top:34vh">✓ Move verified<br><span style="color:#8b8b96">checked by the circuit</span></div>
+<div class="card mono" data-s="1" style="right:7vw;top:30vh"><b>5,000/5,000</b>live positions matched<div class="ticks"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+<div class="card mono" data-s="1" style="left:50%;bottom:9vh;transform:translateX(-50%)">Is column 4 legal? → <span style="color:#ff8f7a">Valid ✓</span></div>
+
+<div class="cen" data-s="2"><h2>Look closer.</h2><p>Rules, down to the last gate.</p></div>
+
+<div class="pn pr" data-s="3"><span class="tag mono">How it works</span>
+<h2>The circuit decides.<br><em>Every move.</em></h2>
+<div class="chips" id="tabs"><button class="on" data-t="0">Rules</button><button data-t="1">Verify</button><button data-t="2">The bot</button></div>
+<p id="panel"></p>
+<div class="mini"><div><b>1,479</b>NAND gates</div><div><b>0</b>mismatches in 5,000 checks</div></div></div>
+
+<div class="pn pl" data-s="4"><span class="tag mono">Try it</span>
+<h2>Your move.<br><em>Beat the bot.</em></h2>
+<div class="board" id="bd"></div><div class="status" id="st"></div>
+<button class="btn" id="reset">Reset</button><p class="fine">Demo board, running in your browser. In real games the circuit checks every move.</p></div>
+
+<div class="pn pr" data-s="5"><span class="tag mono">Play for real</span>
+<h2>Ranked is<br><em>on-chain.</em></h2>
+<ul><li>0.005 OKB to enter</li><li>Browser session key, no pop-up on every move</li><li>60% of fees fund a weekly prize pool</li><li>Full refund if the bot is silent for 10 minutes</li></ul>
+<a class="btn pri" href="game.html">Play casual</a><a class="btn" href="game.html#ranked">Play ranked</a>
+<div class="links mono"><a href="https://www.oklink.com/x-layer/address/0x1c319c3bcb9ed1c35507f029c8e7152ab0590c04" target="_blank" rel="noopener">Game contract</a><a href="https://www.oklink.com/x-layer/address/0xc849714d70A5c1bE8A456C47c644fe90D5B1625C" target="_blank" rel="noopener">Circuit</a><a href="https://github.com/Anoi-xyz/tapefour" target="_blank" rel="noopener">GitHub</a></div>
+<p class="fine">Contracts are unaudited, so keep ranked stakes small.</p></div>
+
+<div style="height:600vh"></div>
+<script>
+(function(){
+const $=s=>document.querySelector(s),clamp=(v,a,b)=>Math.min(b,Math.max(a,v)),sm=t=>{t=clamp(t,0,1);return t*t*(3-2*t)};
+const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
+setInterval(()=>$('#clk').textContent=new Date().toLocaleTimeString('en-GB'),1000);
+document.querySelectorAll('[data-go]').forEach(a=>a.onclick=()=>scrollTo({top:a.dataset.go*innerHeight,behavior:'smooth'}));
+
+/* point-cloud board */
+const cv=$('#cv'),cx=cv.getContext('2d'),dpr=Math.min(devicePixelRatio||1,2);let W,H;
+function size(){W=innerWidth;H=innerHeight;cv.width=W*dpr;cv.height=H*dpr;cv.style.width=W+'px';cv.style.height=H+'px';cx.setTransform(dpr,0,0,dpr,0,0)}
+addEventListener('resize',size);size();
+const COL=[];for(let i=0;i<12;i++){const u=i/11;COL.push('rgb('+(125+130*u|0)+','+(223-80*u|0)+','+(208-86*u|0)+')')}
+COL.push('#ff8f7a','#f2f8f8','#c8f3ec');
+const BW=2.9,BH=2.5,T=.26,P=[],holes=[];
+for(let i=0;i<7;i++)for(let j=0;j<6;j++)holes.push([(i-3)*.4,(2.5-j)*.4,i,j]);
+const bk=y=>Math.min(11,(1-(y+BH/2)/BH)*12|0);
+const add=(x,y,z,b)=>P.push({x,y,z,b});
+for(let x=-BW/2;x<=BW/2;x+=.05)for(let y=-BH/2;y<=BH/2;y+=.05){
+  if(holes.some(h=>Math.hypot(x-h[0],y-h[1])<.155))continue;
+  add(x+(Math.random()-.5)*.02,y+(Math.random()-.5)*.02,T/2,bk(y));}
+for(let z=-T/2;z<=T/2;z+=.065){
+  for(let x=-BW/2;x<=BW/2;x+=.05){add(x,BH/2,z,bk(BH/2));add(x,-BH/2,z,bk(-BH/2))}
+  for(let y=-BH/2;y<=BH/2;y+=.05){add(-BW/2,y,z,bk(y));add(BW/2,y,z,bk(y))}}
+holes.forEach(h=>{for(let k=0;k<14;k++){const a=k/14*6.283;for(const z of[-T/2+.04,0,T/2-.04])add(h[0]+Math.cos(a)*.155,h[1]+Math.sin(a)*.155,z,14)}});
+[[3,5,1],[2,5,2],[4,5,1],[5,5,2],[1,5,1],[3,4,2],[4,4,2],[2,4,1],[5,4,1],[3,3,1],[4,3,2],[2,3,2],[3,2,1],[6,5,2]].forEach(d=>{
+  const h=holes.find(q=>q[2]===d[0]&&q[3]===d[1]);
+  [[0,1],[.05,6],[.09,11],[.125,16]].forEach(r=>{for(let k=0;k<r[1];k++){const a=k/r[1]*6.283;for(const z of[-.05,.05])add(h[0]+Math.cos(a)*r[0],h[1]+Math.sin(a)*r[0],z,d[2]===1?12:13)}})});
+P.sort((a,b)=>a.b-b.b);
+const N=P.length,TX=new Float32Array(N),TY=new Float32Array(N),TZ=new Float32Array(N),SX=new Float32Array(N),SY=new Float32Array(N),SZ=new Float32Array(N),DL=new Float32Array(N),BK=new Uint8Array(N);
+P.forEach((p,i)=>{TX[i]=p.x;TY[i]=p.y;TZ[i]=p.z;BK[i]=p.b;DL[i]=Math.random();
+  const a=Math.random()*6.283,c=Math.random()*2-1,r=4+Math.random()*5,s=Math.sqrt(1-c*c);SX[i]=Math.cos(a)*s*r;SY[i]=c*r;SZ[i]=Math.sin(a)*s*r});
+
+/* scroll choreography: [scale, x, y, yaw, pitch, light-bg] per scene */
+const K=[[1.25,0,.05,-.25,.08,0],[.6,0,.02,-.15,.05,1],[3.4,0,.04,.1,0,0],[1.9,-.3,.08,.75,.1,0],[1.7,.28,.04,-.7,.1,0],[1.5,-.27,.02,.6,.1,0]];
+const cur=K[0].slice(),els=[...document.querySelectorAll('[data-s]')];
+let mx=-999,my=-999,nx=.5,ny=.5,sx=.5,sy=.5;
+addEventListener('pointermove',e=>{mx=e.clientX;my=e.clientY;nx=mx/W;ny=my/H});
+addEventListener('pointerleave',()=>{mx=my=-999});
+const t0=performance.now();
+function frame(now){
+  const pos=clamp(scrollY/H,0,5),i=Math.min(4,pos|0),e=sm(((pos-i)-.12)/.76),a=K[i],b=K[i+1];
+  for(let k=0;k<6;k++)cur[k]+=((a[k]+(b[k]-a[k])*e)-cur[k])*(reduce?1:.1);
+  sx+=(nx-sx)*.06;sy+=(ny-sy)*.06;
+  const L=cur[5],bg='rgb('+(4+228*L|0)+','+(20+223*L|0)+','+(26+216*L|0)+')';document.body.style.background=bg;
+  els.forEach(el=>{const w=clamp(1-Math.abs(pos-el.dataset.s)/.5,0,1),o=clamp(w*1.8,0,1);el.style.setProperty('--o',o.toFixed(3));el.classList.toggle('on',o>.6)});
+  cx.clearRect(0,0,W,H);
+  const mob=W<760,S=Math.min(W,H)*.26*cur[0]*(mob?.7:1),ox=W/2+(mob?0:cur[1])*W,oy=H/2+(cur[2]-(mob&&pos>2.5?.17:0))*H;
+  const yaw=cur[3]+(sx-.5)*.4,pit=cur[4]-(sy-.5)*.2,cy=Math.cos(yaw),sy_=Math.sin(yaw),cp=Math.cos(pit),sp=Math.sin(pit);
+  const iu=reduce?1:clamp((now-t0)/1800,0,1+.6),R=110,R2=R*R;let bkt=-1;
+  for(let q=0;q<N;q++){
+    if(BK[q]!==bkt){bkt=BK[q];cx.fillStyle=COL[bkt]}
+    const u=clamp(iu-DL[q]*.6,0,1),f=1-Math.pow(1-u,3);
+    const x=SX[q]+(TX[q]-SX[q])*f,y=SY[q]+(TY[q]-SY[q])*f,z=SZ[q]+(TZ[q]-SZ[q])*f;
+    const x1=x*cy+z*sy_,z1=-x*sy_+z*cy,y1=y*cp-z1*sp,z2=y*sp+z1*cp,pf=4.2/(4.2-z2);
+    let px=ox+x1*pf*S,py=oy-y1*pf*S;
+    const dx=px-mx,dy=py-my,d2=dx*dx+dy*dy;
+    if(d2<R2){const d=Math.sqrt(d2)||1,k=1-d/R;px+=dx/d*k*k*46;py+=dy/d*k*k*46}
+    const s=Math.max(1,pf*S*.012);cx.fillRect(px-s/2,py-s/2,s,s);
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* tabs */
+const txt=['Every move, yours and the bot’s, runs through a 1,479-gate circuit taped out on X Layer. It decides whether the move is legal and whether someone has won.','Press “Verify move” on any move and the game re-runs the circuit and shows the match. We also checked 5,000 random positions on the live circuit: all 5,000 matched.','The bot picks its moves off-chain, so you trust its strength but not its rules. The circuit still checks every move it makes.'];
+const tabs=$('#tabs');function show(i){$('#panel').textContent=txt[i];tabs.querySelectorAll('button').forEach(b=>b.classList.toggle('on',+b.dataset.t===i))}
+tabs.addEventListener('click',e=>{if(e.target.dataset.t)show(+e.target.dataset.t)});show(0);
+
+/* demo Connect Four */
+const R6=6,C7=7,bd=$('#bd'),st=$('#st');let g,over,busy;
+function init(){g=Array.from({length:R6},()=>Array(C7).fill(0));over=busy=false;render();st.textContent='Your move. You are red.'}
+function render(w){bd.innerHTML='';for(let r=0;r<R6;r++)for(let c=0;c<C7;c++){const d=document.createElement('div');d.className='cell'+(g[r][c]?' p'+g[r][c]:'')+(w&&w.some(q=>q[0]===r&&q[1]===c)?' w':'');d.dataset.c=c;bd.appendChild(d)}}
+function drop(c,p){for(let r=R6-1;r>=0;r--)if(!g[r][c]){g[r][c]=p;return r}return -1}
+function win(p){for(let r=0;r<R6;r++)for(let c=0;c<C7;c++)for(const q of[[0,1],[1,0],[1,1],[1,-1]]){const cells=[];for(let i=0;i<4;i++){const y=r+q[0]*i,x=c+q[1]*i;if(y<0||y>=R6||x<0||x>=C7||g[y][x]!==p)break;cells.push([y,x])}if(cells.length===4)return cells}return null}
+const full=()=>g[0].every(Boolean);
+function pick(){const ok=[0,1,2,3,4,5,6].filter(c=>!g[0][c]);for(const p of[2,1])for(const c of ok){const r=drop(c,p),w=win(p);g[r][c]=0;if(w)return c}ok.sort((x,y)=>Math.abs(x-3)-Math.abs(y-3)+Math.random()-.5);return ok[0]}
+const end=m=>{over=true;st.textContent=m};
+bd.addEventListener('click',e=>{const c=+e.target.dataset.c;if(over||busy||isNaN(c)||drop(c,1)<0)return;const w=win(1);render(w);
+  if(w)return end('You win. In ranked mode the circuit confirms this on-chain.');if(full())return end('Draw.');
+  busy=true;st.textContent='Bot is thinking…';
+  setTimeout(()=>{drop(pick(),2);const w2=win(2);render(w2);busy=false;if(w2)return end('Bot wins. Reset and try again.');if(full())return end('Draw.');st.textContent='Your move.'},500)});
+$('#reset').onclick=init;init();
+})();
+</script></body></html>

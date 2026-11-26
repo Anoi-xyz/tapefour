@@ -3,10 +3,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>TapeFour: Connect Four, enforced by a circuit</title>
 <style>
-:root{--fg:#f4f4f6;--mut:#8b8b96;--acc:#d9ff3f;--vi:#b9a4ff;--line:#26262e}
+:root{--fg:#f4f4f6;--mut:#8b8b96;--acc:#ff8f7a;--vi:#7ddfd0;--line:#26262e}
 *{box-sizing:border-box;margin:0}
 html{scrollbar-width:none}body::-webkit-scrollbar{display:none}
-body{background:#050507;color:var(--fg);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;overflow-x:hidden}
+body{background:#04141a;color:var(--fg);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;overflow-x:hidden}
 a{color:inherit;text-decoration:none}.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,monospace}
 #cv{position:fixed;inset:0;z-index:1;pointer-events:none}
 [data-s]{opacity:var(--o,0);transform:translateY(calc((1 - var(--o,0)) * 24px));pointer-events:none}
@@ -22,7 +22,7 @@ a{color:inherit;text-decoration:none}.mono{font-family:ui-monospace,"Cascadia Mo
 .tag{display:inline-block;margin-bottom:12px;padding:4px 10px;border:1px solid var(--line);border-radius:7px;background:#111118;color:var(--mut);font-size:11px}
 .lead p{font-size:clamp(17px,2.1vw,22px);font-weight:600;line-height:1.25}.lead p em{display:block;font-style:normal;color:var(--mut)}
 .hint{position:fixed;z-index:3;right:4vw;bottom:max(26px,env(safe-area-inset-bottom));font-size:11px;color:var(--mut)}
-.frame{position:fixed;z-index:0;left:50%;top:52%;width:64vw;height:62vh;margin:-31vh 0 0 -32vw;border-radius:20px;background:#060608;box-shadow:0 40px 80px -30px rgba(30,20,60,.5);transform:scale(calc(.9 + .1 * var(--o,0)))}
+.frame{position:fixed;z-index:0;left:50%;top:52%;width:64vw;height:62vh;margin:-31vh 0 0 -32vw;border-radius:20px;background:#05161b;box-shadow:0 40px 80px -30px rgba(10,40,50,.5);transform:scale(calc(.9 + .1 * var(--o,0)))}
 .frame h3{position:absolute;top:7%;width:100%;text-align:center;font-size:clamp(15px,1.8vw,22px);font-weight:600;color:#fff}.frame h3 em{display:block;font-style:normal;color:var(--mut)}
 .card{position:fixed;z-index:3;padding:12px 14px;border-radius:12px;background:rgba(18,18,24,.92);border:1px solid #2a2a33;font-size:12px;color:#d6d6de;box-shadow:0 16px 40px -14px rgba(0,0,0,.6)}
 .card b{display:block;font-size:22px;letter-spacing:-.03em;color:var(--acc)}
@@ -40,7 +40,7 @@ a{color:inherit;text-decoration:none}.mono{font-family:ui-monospace,"Cascadia Mo
 .btn.pri{background:var(--acc);border-color:var(--acc);color:#0a0a0a}
 .board{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;padding:10px;border-radius:16px;background:#14141c;border:1px solid #23232c;cursor:pointer;user-select:none;margin-top:14px}
 .cell{aspect-ratio:1;border-radius:50%;background:#070709;box-shadow:inset 0 3px 6px #000;transition:background .25s}
-.cell:hover{background:#15151d}.cell.p1{background:#ff4d6d}.cell.p2{background:#ffd23f}
+.cell:hover{background:#15151d}.cell.p1{background:#ff6b81}.cell.p2{background:#ffd37a}
 .cell.w{outline:3px solid var(--acc);animation:pu .8s infinite alternate}@keyframes pu{to{transform:scale(1.12)}}
 .status{margin-top:10px;font-size:13px;color:var(--mut);min-height:20px}
 .links{margin-top:18px;display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--mut)}.links a:hover{color:var(--fg)}
@@ -59,7 +59,7 @@ a{color:inherit;text-decoration:none}.mono{font-family:ui-monospace,"Cascadia Mo
 <div class="frame" data-s="1"><h3>Rules you can verify,<em>in one quiet place.</em></h3></div>
 <div class="card mono" data-s="1" style="left:7vw;top:34vh">✓ Move verified<br><span style="color:#8b8b96">checked by the circuit</span></div>
 <div class="card mono" data-s="1" style="right:7vw;top:30vh"><b>5,000/5,000</b>live positions matched<div class="ticks"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
-<div class="card mono" data-s="1" style="left:50%;bottom:9vh;transform:translateX(-50%)">Is column 4 legal? → <span style="color:#d9ff3f">Valid ✓</span></div>
+<div class="card mono" data-s="1" style="left:50%;bottom:9vh;transform:translateX(-50%)">Is column 4 legal? → <span style="color:#ff8f7a">Valid ✓</span></div>
 
 <div class="cen" data-s="2"><h2>Look closer.</h2><p>Rules, down to the last gate.</p></div>
 
@@ -93,8 +93,8 @@ document.querySelectorAll('[data-go]').forEach(a=>a.onclick=()=>scrollTo({top:a.
 const cv=$('#cv'),cx=cv.getContext('2d'),dpr=Math.min(devicePixelRatio||1,2);let W,H;
 function size(){W=innerWidth;H=innerHeight;cv.width=W*dpr;cv.height=H*dpr;cv.style.width=W+'px';cv.style.height=H+'px';cx.setTransform(dpr,0,0,dpr,0,0)}
 addEventListener('resize',size);size();
-const COL=[];for(let i=0;i<12;i++){const u=i/11;COL.push('rgb('+(185+32*u|0)+','+(164+91*u|0)+','+(255-192*u|0)+')')}
-COL.push('#d9ff3f','#f2f2f8','#d6c9ff');
+const COL=[];for(let i=0;i<12;i++){const u=i/11;COL.push('rgb('+(125+130*u|0)+','+(223-80*u|0)+','+(208-86*u|0)+')')}
+COL.push('#ff8f7a','#f2f8f8','#c8f3ec');
 const BW=2.9,BH=2.5,T=.26,P=[],holes=[];
 for(let i=0;i<7;i++)for(let j=0;j<6;j++)holes.push([(i-3)*.4,(2.5-j)*.4,i,j]);
 const bk=y=>Math.min(11,(1-(y+BH/2)/BH)*12|0);
@@ -125,7 +125,7 @@ function frame(now){
   const pos=clamp(scrollY/H,0,5),i=Math.min(4,pos|0),e=sm(((pos-i)-.12)/.76),a=K[i],b=K[i+1];
   for(let k=0;k<6;k++)cur[k]+=((a[k]+(b[k]-a[k])*e)-cur[k])*(reduce?1:.1);
   sx+=(nx-sx)*.06;sy+=(ny-sy)*.06;
-  const L=cur[5],bg='rgb('+(5+231*L|0)+','+(5+230*L|0)+','+(7+236*L|0)+')';document.body.style.background=bg;
+  const L=cur[5],bg='rgb('+(4+228*L|0)+','+(20+223*L|0)+','+(26+216*L|0)+')';document.body.style.background=bg;
   els.forEach(el=>{const w=clamp(1-Math.abs(pos-el.dataset.s)/.5,0,1),o=clamp(w*1.8,0,1);el.style.setProperty('--o',o.toFixed(3));el.classList.toggle('on',o>.6)});
   cx.clearRect(0,0,W,H);
   const mob=W<760,S=Math.min(W,H)*.26*cur[0]*(mob?.7:1),ox=W/2+(mob?0:cur[1])*W,oy=H/2+(cur[2]-(mob&&pos>2.5?.17:0))*H;

@@ -1188,7 +1188,7 @@ class ConnectFourApp {
     `;
 
     this.modalOutputBreakdown.innerHTML = `
-      <div class="bit-row"><span>Move Validity:</span> <b style="color:#00ffcc">${v.valid ? 'VALID (1)' : 'INVALID (0)'}</b> (bit 0)</div>
+      <div class="bit-row"><span>Move Validity:</span> <b style="color:var(--aqua)">${v.valid ? 'VALID (1)' : 'INVALID (0)'}</b> (bit 0)</div>
       <div class="bit-row"><span>Mover Win Flag:</span> <b>${v.win ? 'WIN (1)' : 'NO WIN (0)'}</b> (bit 85)</div>
       <div class="bit-row"><span>Board Full (Draw):</span> <b>${v.draw ? 'DRAW (1)' : 'NO (0)'}</b> (bit 86)</div>
       <div class="bit-row"><span>Source:</span> <b>${srcLabel}</b></div>
