@@ -1,22 +1,55 @@
 /* TapeFour Dark Theme & Mobile-First Stylesheet */
+/* Glassmorphism Panels with Flat Pill Controls & Landing Page Palette */
 
 :root {
-  --bg-primary: #0a0c10;
-  --bg-secondary: #141820;
-  --bg-tertiary: #1b212c;
-  --border-color: #273040;
-  --text-main: #f0f3f6;
-  --text-muted: #8b949e;
-  --accent-cyan: #00d2ff;
-  --accent-purple: #7928ca;
-  --player-a: #ff3366; /* Vibrant Red / Neon Coral */
-  --player-b: #ffcc00; /* Vibrant Gold / Cyber Yellow */
-  --cell-empty: #0c0f16;
-  --board-blue: #16243b;
-  --board-border: #233758;
-  --win-glow: #00ffcc;
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  /* Color Palette matching web/index.html */
+  --bg-base: #050507;
+  --fg: #f4f4f6;
+  --mut: #8b8b96;
+  --acc: #d9ff3f; /* Lime */
+  --vi: #b9a4ff; /* Lavender */
+  --line: #26262e;
+  --line-light: rgba(255, 255, 255, 0.09);
+  --line-focus: rgba(217, 255, 63, 0.4);
+
+  /* Fallback Solid Backgrounds (when backdrop-filter is unsupported) */
+  --panel-fallback: #0e0e15;
+  --card-fallback: #12121a;
+  --modal-fallback: #111119;
+  --menu-fallback: #14141d;
+
+  /* Glassmorphism Variables */
+  --glass-panel: rgba(14, 14, 21, 0.78);
+  --glass-card: rgba(18, 18, 27, 0.85);
+  --glass-input: rgba(255, 255, 255, 0.05);
+  --glass-input-hover: rgba(255, 255, 255, 0.08);
+  --glass-blur: 16px;
+  --glass-blur-modal: 20px;
+
+  /* Board & Discs */
+  --board-bg: #0d0d13;
+  --board-border: rgba(255, 255, 255, 0.08);
+  --cell-empty: #050508;
+  --player-a: #ff4d6d; /* Solid vibrant red disc */
+  --player-b: #ffd23f; /* Solid vibrant yellow disc */
+  --win-highlight: #d9ff3f; /* Crisp lime outline & glow */
+
+  /* Status Chip Colors */
+  --status-verified-bg: rgba(61, 255, 138, 0.12);
+  --status-verified-border: rgba(61, 255, 138, 0.32);
+  --status-verified-text: #3dff8a;
+
+  --status-pending-bg: rgba(251, 191, 36, 0.12);
+  --status-pending-border: rgba(251, 191, 36, 0.35);
+  --status-pending-text: #fbbf24;
+
+  --status-error-bg: rgba(255, 77, 109, 0.12);
+  --status-error-border: rgba(255, 77, 109, 0.35);
+  --status-error-text: #ff4d6d;
+
+  /* Typography matching landing page */
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
 }
 
 * {
@@ -27,15 +60,25 @@
 }
 
 body {
-  background-color: var(--bg-primary);
-  color: var(--text-main);
+  background-color: var(--bg-base);
+  background-image:
+    radial-gradient(circle at 12% 10%, rgba(185, 164, 255, 0.13) 0%, transparent 45%),
+    radial-gradient(circle at 88% 90%, rgba(217, 255, 63, 0.08) 0%, transparent 42%),
+    radial-gradient(circle at 75% 22%, rgba(185, 164, 255, 0.05) 0%, transparent 35%);
+  background-attachment: fixed;
+  color: var(--fg);
   font-family: var(--font-sans);
   min-height: 100vh;
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 12px;
+  padding: 16px 12px;
   overflow-x: hidden;
+  line-height: 1.5;
+}
+
+.mono {
+  font-family: var(--font-mono);
 }
 
 .app-container {
@@ -43,15 +86,20 @@ body {
   max-width: 480px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
+  position: relative;
+  z-index: 2;
 }
 
-/* Header */
+/* =========================================================
+   Header & Navigation
+   ========================================================= */
+
 .app-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 4px;
+  padding: 4px 2px;
   flex-wrap: wrap;
   gap: 8px;
 }
@@ -59,101 +107,324 @@ body {
 .header-branding {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
 .back-link {
   font-size: 0.75rem;
-  color: var(--text-muted);
+  color: var(--mut);
   text-decoration: none;
   font-weight: 500;
-  padding: 3px 8px;
-  border-radius: 6px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
+  padding: 5px 12px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--line-light);
   transition: all 0.15s ease;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
 }
 
 .back-link:hover {
-  color: var(--text-main);
-  border-color: var(--accent-cyan);
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateX(-1px);
 }
 
 .logo {
-  font-size: 1.6rem;
+  font-size: 1.55rem;
   font-weight: 800;
-  letter-spacing: -0.5px;
-  color: #ffffff;
+  letter-spacing: -0.04em;
+  color: var(--fg);
+  line-height: 1;
 }
 
 .logo-accent {
-  background: linear-gradient(135deg, var(--accent-cyan), var(--player-a));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: var(--acc);
 }
 
 .version-tag {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 600;
-  padding: 2px 7px;
-  border-radius: 12px;
-  background-color: var(--bg-tertiary);
-  color: var(--accent-cyan);
-  border: 1px solid var(--border-color);
+  padding: 3px 10px;
+  border-radius: 9999px;
+  background: rgba(185, 164, 255, 0.1);
+  color: var(--vi);
+  border: 1px solid rgba(185, 164, 255, 0.28);
   text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-family: var(--font-mono);
 }
 
-/* Controls Bar */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* =========================================================
+   Glassmorphism Panels (with solid-color fallbacks)
+   ========================================================= */
+
+/* Solid background fallback for all panels */
+.controls-bar,
+.status-panel,
+.ranked-panel,
+.modal-card,
+.wallet-modal-card,
+.wallet-menu {
+  background: var(--panel-fallback);
+  border: 1px solid var(--line-light);
+  border-radius: 16px;
+  box-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.65);
+}
+
+/* Enhanced blur where backdrop-filter is supported */
+@supports (backdrop-filter: blur(12px)) or (-webkit-backdrop-filter: blur(12px)) {
+  .controls-bar,
+  .status-panel,
+  .ranked-panel {
+    background: var(--glass-panel);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+  }
+
+  .wallet-menu {
+    background: rgba(18, 18, 26, 0.92);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+  }
+
+  .modal-card,
+  .wallet-modal-card {
+    background: rgba(16, 16, 24, 0.9);
+    backdrop-filter: blur(var(--glass-blur-modal));
+    -webkit-backdrop-filter: blur(var(--glass-blur-modal));
+  }
+}
+
+/* =========================================================
+   Controls / Settings Bar (Flat Pill Controls)
+   ========================================================= */
+
 .controls-bar {
   display: flex;
   gap: 8px;
-  background: var(--bg-secondary);
-  padding: 8px 12px;
-  border-radius: 10px;
-  border: 1px solid var(--border-color);
+  padding: 10px 14px;
 }
 
 .control-group {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
+  min-width: 0;
 }
 
 .control-group label {
   font-size: 0.68rem;
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--mut);
   text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding-left: 4px;
 }
 
 .dropdown {
-  background: var(--bg-tertiary);
-  color: var(--text-main);
-  border: 1px solid var(--border-color);
-  padding: 6px 8px;
-  border-radius: 6px;
-  font-size: 0.8rem;
+  background: var(--glass-input);
+  color: var(--fg);
+  border: 1px solid var(--line-light);
+  padding: 7px 12px;
+  border-radius: 9999px;
+  font-size: 0.78rem;
+  font-family: var(--font-sans);
+  font-weight: 500;
   outline: none;
   cursor: pointer;
-  transition: border-color 0.2s;
+  transition: all 0.15s ease;
+  width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dropdown:hover {
+  background: var(--glass-input-hover);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .dropdown:focus {
-  border-color: var(--accent-cyan);
+  border-color: var(--acc);
+  box-shadow: 0 0 0 2px rgba(217, 255, 63, 0.2);
 }
 
-/* Status & Verification Bar */
+.dropdown option {
+  background: #0d0d14;
+  color: var(--fg);
+}
+
+/* =========================================================
+   Buttons (Primary Lime Pill, Secondary Glass Pill)
+   ========================================================= */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 18px;
+  border-radius: 9999px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  border: 1px solid transparent;
+  outline: none;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Primary Lime Pill with dark text */
+.btn-primary,
+.btn-accent {
+  background: var(--acc);
+  border-color: var(--acc);
+  color: #0a0a0a;
+  box-shadow: 0 4px 14px rgba(217, 255, 63, 0.22);
+}
+
+.btn-primary:hover:not(:disabled),
+.btn-accent:hover:not(:disabled) {
+  background: #e6ff66;
+  border-color: #e6ff66;
+  box-shadow: 0 4px 20px rgba(217, 255, 63, 0.4);
+  transform: translateY(-1px);
+}
+
+/* Secondary Glass Pill */
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--fg);
+  border-color: var(--line-light);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+/* Warning & Danger Action Pills */
+.btn-warning {
+  background: rgba(251, 191, 36, 0.18);
+  border-color: rgba(251, 191, 36, 0.4);
+  color: #fbbf24;
+  border-radius: 9999px;
+  font-size: 0.78rem;
+  padding: 6px 14px;
+}
+
+.btn-warning:hover:not(:disabled) {
+  background: rgba(251, 191, 36, 0.28);
+  border-color: #fbbf24;
+}
+
+.btn-warning-action {
+  background: rgba(255, 77, 109, 0.2);
+  border-color: rgba(255, 77, 109, 0.4);
+  color: #ff4d6d;
+  border-radius: 9999px;
+  font-size: 0.78rem;
+  padding: 6px 14px;
+}
+
+.btn-warning-action:hover:not(:disabled) {
+  background: rgba(255, 77, 109, 0.32);
+  border-color: #ff4d6d;
+}
+
+/* =========================================================
+   Status Chips (Verified, Pending, Error flat pills)
+   ========================================================= */
+
+/* Verified status chip */
+.verification-badge,
+.operator-badge.online,
+.tx-status.success {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--status-verified-bg);
+  border: 1px solid var(--status-verified-border);
+  color: var(--status-verified-text);
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 10px;
+}
+
+/* Pending status chip */
+.operator-badge.checking,
+.tx-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--status-pending-bg);
+  border: 1px solid var(--status-pending-border);
+  color: var(--status-pending-text);
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 10px;
+}
+
+/* Error status chip */
+.operator-badge.offline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--status-error-bg);
+  border: 1px solid var(--status-error-border);
+  color: var(--status-error-text);
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 10px;
+}
+
+.operator-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--line-light);
+  color: var(--mut);
+}
+
+/* =========================================================
+   Status & Turn Indicator Panel
+   ========================================================= */
+
 .status-panel {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  background: var(--bg-secondary);
-  padding: 10px 14px;
-  border-radius: 10px;
-  border: 1px solid var(--border-color);
+  gap: 10px;
+  padding: 12px 16px;
 }
 
 .turn-indicator {
@@ -166,59 +437,171 @@ body {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  box-shadow: 0 0 10px currentColor;
-  transition: background-color 0.3s, color 0.3s;
+  transition: all 0.25s ease;
+  flex-shrink: 0;
 }
 
 .player-dot.dot-a {
   background-color: var(--player-a);
-  color: var(--player-a);
+  box-shadow: 0 0 12px rgba(255, 77, 109, 0.6);
 }
 
 .player-dot.dot-b {
   background-color: var(--player-b);
-  color: var(--player-b);
+  box-shadow: 0 0 12px rgba(255, 210, 63, 0.6);
 }
 
 .status-text {
-  font-size: 1rem;
+  font-size: 0.98rem;
   font-weight: 700;
-  letter-spacing: -0.2px;
+  color: var(--fg);
+  letter-spacing: -0.01em;
 }
 
 .verification-badge {
-  display: flex;
-  align-items: center;
   justify-content: space-between;
-  background: rgba(0, 210, 255, 0.06);
-  border: 1px solid rgba(0, 210, 255, 0.2);
-  padding: 6px 10px;
-  border-radius: 6px;
-  font-size: 0.75rem;
+  width: 100%;
+  padding: 5px 12px;
 }
 
 .badge-label {
-  color: #7ce3ff;
-  font-weight: 500;
+  color: var(--status-verified-text);
+  font-weight: 600;
+  font-size: 0.74rem;
 }
 
 .btn-inspect {
-  background: rgba(0, 210, 255, 0.15);
-  border: 1px solid rgba(0, 210, 255, 0.4);
-  color: #ffffff;
-  padding: 3px 8px;
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: var(--fg);
+  padding: 3px 10px;
+  border-radius: 9999px;
   font-size: 0.72rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.15s ease;
 }
 
 .btn-inspect:hover {
-  background: rgba(0, 210, 255, 0.3);
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
-/* Board Area */
+/* =========================================================
+   Ranked Panel & Warning Bars
+   ========================================================= */
+
+.ranked-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px;
+  border: 1px solid rgba(217, 255, 63, 0.22);
+}
+
+.ranked-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ranked-label {
+  font-weight: 700;
+  color: var(--acc);
+  font-size: 0.88rem;
+}
+
+.ranked-fee {
+  font-size: 0.78rem;
+  color: var(--mut);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--line-light);
+  padding: 2px 10px;
+  border-radius: 9999px;
+  font-family: var(--font-mono);
+}
+
+.ranked-status {
+  font-size: 0.8rem;
+  color: var(--fg);
+  flex: 1;
+}
+
+.ranked-tx {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+}
+
+.tx-label {
+  color: var(--mut);
+}
+
+.tx-hash {
+  color: var(--vi);
+  text-decoration: none;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+}
+
+.tx-hash:hover {
+  text-decoration: underline;
+  color: var(--acc);
+}
+
+.ranked-game-info {
+  display: flex;
+  gap: 14px;
+  font-size: 0.75rem;
+  color: var(--mut);
+  flex-wrap: wrap;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.ranked-game-info b {
+  color: var(--fg);
+}
+
+/* Warning & Timeout Bars */
+.network-warning-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: rgba(45, 14, 20, 0.85);
+  border: 1px solid rgba(255, 77, 109, 0.35);
+  border-radius: 14px;
+  padding: 10px 14px;
+  font-size: 0.8rem;
+  color: #ffc9d2;
+}
+
+.bot-timeout-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: rgba(45, 30, 10, 0.85);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  border-radius: 14px;
+  padding: 10px 14px;
+  font-size: 0.8rem;
+  color: #fef08a;
+}
+
+.warning-msg,
+.timeout-msg {
+  flex: 1;
+  font-weight: 500;
+}
+
+/* =========================================================
+   Board & Discs (Dark board, Solid discs, Clear Win Glow)
+   ========================================================= */
+
 .board-container {
   display: flex;
   flex-direction: column;
@@ -237,17 +620,20 @@ body {
 .col-picker {
   background: transparent;
   border: none;
-  color: var(--text-muted);
-  font-size: 1rem;
+  color: var(--mut);
+  font-size: 0.95rem;
   padding: 6px 0;
   cursor: pointer;
-  border-radius: 6px;
-  transition: color 0.2s, background-color 0.2s;
+  border-radius: 9999px;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .col-picker:hover:not(:disabled) {
-  color: var(--accent-cyan);
-  background-color: rgba(0, 210, 255, 0.1);
+  color: var(--acc);
+  background-color: rgba(217, 255, 63, 0.12);
 }
 
 .col-picker:disabled {
@@ -262,44 +648,50 @@ body {
   gap: 8px;
   width: 100%;
   aspect-ratio: 7 / 6;
-  background: var(--board-blue);
-  padding: 10px;
-  border-radius: 16px;
-  border: 2px solid var(--board-border);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), inset 0 2px 4px rgba(255, 255, 255, 0.05);
+  background: var(--board-bg);
+  padding: 12px;
+  border-radius: 20px;
+  border: 1px solid var(--board-border);
+  box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.9), inset 0 1px 2px rgba(255, 255, 255, 0.05);
   position: relative;
 }
 
-/* Individual Cell */
+/* Cell Cutout Slot */
 .cell-slot {
   background: var(--cell-empty);
   border-radius: 50%;
   width: 100%;
   height: 100%;
-  box-shadow: inset 0 4px 8px rgba(0, 0, 0, 0.8);
+  box-shadow: inset 0 3px 6px #000000;
   display: flex;
   justify-content: center;
   align-items: center;
   cursor: pointer;
   position: relative;
   overflow: hidden;
+  transition: background 0.2s ease;
 }
 
-/* Stone Piece */
+.cell-slot:hover {
+  background: #0d0d14;
+}
+
+/* Solid Red & Yellow Discs */
 .piece {
-  width: 90%;
-  height: 90%;
+  width: 88%;
+  height: 88%;
   border-radius: 50%;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5), inset 0 2px 5px rgba(255, 255, 255, 0.4);
   position: relative;
 }
 
 .piece.player-a {
-  background: radial-gradient(circle at 35% 35%, #ff6b8b, var(--player-a) 70%, #99002b);
+  background: var(--player-a);
+  box-shadow: 0 3px 10px rgba(255, 77, 109, 0.35), inset 0 2px 3px rgba(255, 255, 255, 0.35);
 }
 
 .piece.player-b {
-  background: radial-gradient(circle at 35% 35%, #fff280, var(--player-b) 70%, #b38600);
+  background: var(--player-b);
+  box-shadow: 0 3px 10px rgba(255, 210, 63, 0.35), inset 0 2px 3px rgba(255, 255, 255, 0.35);
 }
 
 /* Drop Animation */
@@ -324,86 +716,69 @@ body {
   animation: dropIn 0.36s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
 }
 
-/* Win Highlight Glow */
+/* Clear Winning Cell Highlight (Lime Outline & Glow Pulse) */
 @keyframes winPulse {
   0% {
-    box-shadow: 0 0 10px var(--win-glow), inset 0 0 15px var(--win-glow);
-    transform: scale(0.92);
+    box-shadow: 0 0 10px var(--win-highlight), 0 0 20px rgba(217, 255, 63, 0.4);
+    transform: scale(0.96);
   }
   50% {
-    box-shadow: 0 0 24px var(--win-glow), inset 0 0 20px var(--win-glow);
-    transform: scale(1.04);
+    box-shadow: 0 0 26px var(--win-highlight), 0 0 40px rgba(217, 255, 63, 0.7);
+    transform: scale(1.05);
   }
   100% {
-    box-shadow: 0 0 10px var(--win-glow), inset 0 0 15px var(--win-glow);
-    transform: scale(0.92);
+    box-shadow: 0 0 10px var(--win-highlight), 0 0 20px rgba(217, 255, 63, 0.4);
+    transform: scale(0.96);
   }
+}
+
+.cell-slot.winning-cell {
+  outline: 3px solid var(--win-highlight);
+  outline-offset: -1px;
+  z-index: 2;
 }
 
 .cell-slot.winning-cell .piece {
   animation: winPulse 1.2s infinite ease-in-out;
-  border: 2px solid #ffffff;
 }
 
-/* Footer Stats */
+/* =========================================================
+   Footer & Stats (Flat Glass Pills)
+   ========================================================= */
+
 .app-footer {
-  padding: 4px;
+  padding: 4px 0 8px;
 }
 
 .stats-row {
   display: flex;
   justify-content: space-between;
   gap: 6px;
+  flex-wrap: wrap;
 }
 
 .stat-pill {
   flex: 1;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  padding: 6px 8px;
-  font-size: 0.68rem;
+  min-width: 90px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line-light);
+  border-radius: 9999px;
+  padding: 6px 12px;
+  font-size: 0.7rem;
   text-align: center;
-  color: var(--text-muted);
+  color: var(--mut);
+  font-family: var(--font-mono);
 }
 
 .stat-pill .label {
-  color: var(--text-main);
+  color: var(--fg);
   font-weight: 600;
 }
 
-/* Buttons */
-.btn {
-  padding: 7px 14px;
-  border-radius: 6px;
-  font-weight: 600;
-  font-size: 0.85rem;
-  cursor: pointer;
-  border: none;
-  outline: none;
-  transition: background 0.2s, transform 0.1s;
-}
+/* =========================================================
+   Modals & Glassmorphic Scrim
+   ========================================================= */
 
-.btn:active {
-  transform: scale(0.97);
-}
-
-.btn-secondary {
-  background: var(--bg-tertiary);
-  color: var(--text-main);
-  border: 1px solid var(--border-color);
-}
-
-.btn-secondary:hover {
-  border-color: var(--accent-cyan);
-}
-
-.btn-primary {
-  background: var(--accent-cyan);
-  color: #000000;
-}
-
-/* Modal */
 .modal-backdrop {
   display: none;
   position: fixed;
@@ -411,12 +786,18 @@ body {
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.74);
   justify-content: center;
   align-items: center;
   padding: 16px;
   z-index: 1000;
+}
+
+@supports (backdrop-filter: blur(8px)) or (-webkit-backdrop-filter: blur(8px)) {
+  .modal-backdrop {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
 }
 
 .modal-backdrop.active {
@@ -424,316 +805,163 @@ body {
 }
 
 .modal-card {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
   width: 100%;
   max-width: 440px;
   max-height: 85vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
+  border-radius: 20px;
+  box-shadow: 0 30px 70px -15px rgba(0, 0, 0, 0.85);
 }
 
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--border-color);
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line-light);
 }
 
 .modal-title {
   font-size: 1rem;
   font-weight: 700;
+  color: var(--fg);
 }
 
 .btn-close {
   background: transparent;
   border: none;
-  color: var(--text-muted);
+  color: var(--mut);
   font-size: 1.4rem;
   cursor: pointer;
   line-height: 1;
+  transition: color 0.15s ease;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.btn-close:hover {
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .modal-body {
-  padding: 16px 18px;
+  padding: 18px 20px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
 }
 
 .modal-section h4 {
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   text-transform: uppercase;
-  color: var(--text-muted);
-  margin-bottom: 6px;
+  color: var(--mut);
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+
+.text-highlight {
+  color: var(--acc);
+}
+
+.text-muted {
+  color: var(--mut);
 }
 
 .code-box {
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  padding: 8px 10px;
+  background: rgba(5, 5, 8, 0.85);
+  border: 1px solid var(--line-light);
+  border-radius: 10px;
+  padding: 10px 12px;
   font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: var(--accent-cyan);
+  font-size: 0.74rem;
+  color: var(--vi);
   word-break: break-all;
   white-space: pre-wrap;
 }
 
 .bit-breakdown {
-  margin-top: 6px;
+  margin-top: 8px;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 0.75rem;
+  font-size: 0.74rem;
+  font-family: var(--font-mono);
 }
 
 .bit-row {
   display: flex;
   justify-content: space-between;
-  padding: 3px 6px;
-  background: rgba(255, 255, 255, 0.02);
-  border-radius: 4px;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
 }
 
 .modal-footer {
-  padding: 12px 18px;
-  border-top: 1px solid var(--border-color);
+  padding: 14px 20px;
+  border-top: 1px solid var(--line-light);
   display: flex;
   justify-content: flex-end;
+  gap: 10px;
 }
 
-/* =========================================================
-   Ranked Mode Styles
-   ========================================================= */
-
-.btn-accent {
-  background: linear-gradient(135deg, #f7931a, #ff6b35);
-  color: #fff;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 8px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.15s;
-}
-.btn-accent:hover { opacity: 0.85; }
-.btn-accent:disabled { opacity: 0.4; cursor: not-allowed; }
-
-/* Ranked info panel */
-.ranked-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  background: linear-gradient(135deg, #1a1a2e, #16213e);
-  border: 1px solid #f7931a44;
-  border-radius: 10px;
-  padding: 10px 14px;
-  margin: 0 12px 8px;
-}
-
-.ranked-info {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.ranked-label {
-  font-weight: 700;
-  color: #f7931a;
-  font-size: 0.9rem;
-}
-
-.ranked-fee {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  background: #0a0c1066;
-  padding: 2px 8px;
-  border-radius: 20px;
-}
-
-.ranked-status {
-  font-size: 0.8rem;
-  color: var(--text-main);
-  flex: 1;
-}
-
-.ranked-tx {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.75rem;
-}
-
-.tx-label { color: var(--text-muted); }
-.tx-hash {
-  color: var(--accent-cyan);
-  text-decoration: none;
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-}
-.tx-hash:hover { text-decoration: underline; }
-.tx-status {
-  color: #f7931a;
-  font-weight: 600;
-}
-
-.ranked-game-info {
-  display: flex;
-  gap: 16px;
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
-
-/* Ranked start modal extras */
+/* Ranked Info List & Breakdown in Modal */
 .ranked-info-list {
   margin: 0;
-  padding-left: 18px;
-  font-size: 0.85rem;
-  color: var(--text-main);
+  padding-left: 20px;
+  font-size: 0.84rem;
+  color: var(--fg);
   line-height: 1.6;
 }
 
+.ranked-info-list li {
+  margin-bottom: 4px;
+}
+
 .ranked-fee-breakdown {
-  background: var(--bg-tertiary);
-  border-radius: 8px;
-  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line-light);
+  border-radius: 12px;
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .fee-row {
   display: flex;
   justify-content: space-between;
-  font-size: 0.85rem;
-  color: var(--text-muted);
+  font-size: 0.82rem;
+  color: var(--mut);
 }
-.fee-row b { color: var(--text-main); }
+
+.fee-row b {
+  color: var(--fg);
+  font-family: var(--font-mono);
+}
 
 .trust-note {
   font-size: 0.78rem;
-  color: var(--text-muted);
+  color: var(--mut);
   line-height: 1.5;
-  border-left: 3px solid #f7931a44;
-  padding-left: 10px;
-}
-.trust-note b { color: var(--text-main); }
-
-/* Bot timeout bar & refund action */
-.bot-timeout-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  background: #3b2204;
-  border: 1px solid #d97706;
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 0.8rem;
-  color: #fde68a;
-  animation: fadeIn 0.3s ease;
+  border-left: 3px solid var(--vi);
+  background: rgba(185, 164, 255, 0.05);
+  padding: 10px 12px;
+  border-radius: 0 10px 10px 0;
 }
 
-.timeout-msg {
-  flex: 1;
-  font-weight: 500;
-}
-
-.btn-warning {
-  background: #d97706;
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  padding: 5px 12px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s;
-  white-space: nowrap;
-}
-
-.btn-warning:hover {
-  background: #b45309;
-}
-
-.btn-warning:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-/* Network warning banner */
-.network-warning-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  background: #3b1114;
-  border: 1px solid #ef4444;
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 0.8rem;
-  color: #fecaca;
-  margin: 0 4px 6px;
-}
-
-.warning-msg {
-  flex: 1;
-  font-weight: 500;
-}
-
-.btn-warning-action {
-  background: #dc2626;
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  padding: 5px 12px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.2s;
-}
-
-.btn-warning-action:hover {
-  background: #b91c1c;
-}
-
-.operator-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 0.75rem;
-  padding: 2px 8px;
-  border-radius: 12px;
-  background: #141820;
-  border: 1px solid var(--border-color);
-}
-
-.operator-badge.online {
-  color: #10b981;
-  border-color: #05966955;
-}
-
-.operator-badge.offline {
-  color: #ef4444;
-  border-color: #dc262655;
-}
-
-.operator-badge.checking {
-  color: #f59e0b;
-  border-color: #d9770655;
+.trust-note b {
+  color: var(--fg);
 }
 
 /* =========================================================
-   Wallet Picker (EIP-6963) & Account Menu Styles
+   Wallet Picker (EIP-6963) & Account Menu
    ========================================================= */
 
 .wallet-control-container {
@@ -743,14 +971,11 @@ body {
 
 .wallet-menu {
   position: absolute;
-  top: calc(100% + 6px);
+  top: calc(100% + 8px);
   right: 0;
-  min-width: 180px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
+  min-width: 190px;
+  border-radius: 14px;
   padding: 6px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
   z-index: 150;
   display: flex;
   flex-direction: column;
@@ -760,46 +985,46 @@ body {
 .wallet-menu-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
-  padding: 8px 10px;
+  padding: 8px 12px;
   background: transparent;
   border: none;
-  border-radius: 6px;
-  color: var(--text-main);
+  border-radius: 8px;
+  color: var(--fg);
   font-size: 0.82rem;
   font-weight: 500;
+  font-family: var(--font-sans);
   text-align: left;
   text-decoration: none;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: all 0.15s ease;
 }
 
 .wallet-menu-item:hover {
-  background: var(--bg-tertiary);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .wallet-menu-item.text-danger {
-  color: #ef4444;
+  color: var(--status-error-text);
 }
 
 .wallet-menu-item.text-danger:hover {
-  background: rgba(239, 68, 68, 0.15);
+  background: rgba(255, 77, 109, 0.15);
 }
 
 .wallet-menu-divider {
   height: 1px;
-  background: var(--border-color);
+  background: var(--line-light);
   margin: 4px 0;
 }
 
 .menu-icon {
   font-size: 0.9rem;
-  width: 16px;
+  width: 18px;
   text-align: center;
 }
 
-/* Wallet modal card */
 .wallet-modal-card {
   max-width: 400px;
 }
@@ -816,17 +1041,18 @@ body {
   justify-content: space-between;
   width: 100%;
   padding: 10px 14px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line-light);
+  border-radius: 12px;
   cursor: pointer;
-  color: var(--text-main);
-  transition: all 0.2s;
+  color: var(--fg);
+  font-family: var(--font-sans);
+  transition: all 0.15s ease;
 }
 
 .wallet-item:hover {
-  border-color: var(--accent-cyan);
-  background: rgba(0, 210, 255, 0.08);
+  border-color: var(--acc);
+  background: rgba(217, 255, 63, 0.08);
   transform: translateY(-1px);
 }
 
@@ -839,16 +1065,16 @@ body {
 .wallet-icon {
   width: 28px;
   height: 28px;
-  border-radius: 6px;
+  border-radius: 7px;
   object-fit: contain;
 }
 
 .wallet-icon-fallback {
   width: 28px;
   height: 28px;
-  border-radius: 6px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--line-light);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -856,7 +1082,7 @@ body {
 }
 
 .wallet-name {
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   font-weight: 600;
 }
 
@@ -864,22 +1090,23 @@ body {
   font-size: 0.7rem;
   font-weight: 600;
   padding: 2px 8px;
-  border-radius: 12px;
-  background: rgba(0, 210, 255, 0.15);
-  color: var(--accent-cyan);
-  border: 1px solid rgba(0, 210, 255, 0.3);
+  border-radius: 9999px;
+  background: rgba(217, 255, 63, 0.14);
+  color: var(--acc);
+  border: 1px solid rgba(217, 255, 63, 0.35);
+  font-family: var(--font-mono);
 }
 
 .no-wallets-message {
   padding: 12px 0 6px;
   text-align: center;
-  color: var(--text-muted);
+  color: var(--mut);
 }
 
 .install-prompt {
   font-size: 0.8rem;
   margin: 6px 0 14px;
-  color: var(--text-muted);
+  color: var(--mut);
 }
 
 .wallet-install-links {
@@ -889,24 +1116,74 @@ body {
 }
 
 .wallet-install-item {
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  color: var(--text-main);
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line-light);
+  color: var(--fg);
   text-decoration: none;
-  font-size: 0.85rem;
+  font-size: 0.84rem;
   font-weight: 600;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  transition: all 0.15s;
+  transition: all 0.15s ease;
 }
 
 .wallet-install-item:hover {
-  border-color: var(--accent-cyan);
-  color: var(--accent-cyan);
-  background: rgba(0, 210, 255, 0.05);
+  border-color: var(--acc);
+  color: var(--acc);
+  background: rgba(217, 255, 63, 0.06);
 }
 
+/* =========================================================
+   Mobile Responsiveness (Phone Width <= 480px)
+   ========================================================= */
 
+@media (max-width: 480px) {
+  body {
+    padding: 10px 8px;
+  }
+
+  .app-container {
+    gap: 10px;
+  }
+
+  .app-header {
+    gap: 6px;
+  }
+
+  .logo {
+    font-size: 1.35rem;
+  }
+
+  .controls-bar {
+    gap: 6px;
+    padding: 8px 10px;
+  }
+
+  .dropdown {
+    padding: 6px 10px;
+    font-size: 0.74rem;
+  }
+
+  .btn {
+    padding: 7px 14px;
+    font-size: 0.8rem;
+  }
+
+  .board-frame {
+    gap: 6px;
+    padding: 8px;
+    border-radius: 16px;
+  }
+
+  .column-pickers {
+    padding: 0 4px 4px 4px;
+    gap: 6px;
+  }
+
+  .wallet-install-links {
+    grid-template-columns: 1fr;
+  }
+}
