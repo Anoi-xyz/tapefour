@@ -7,7 +7,7 @@ import {
   OnChainEvalRulesEngine,
   WINNING_LINES,
 } from './engine.js';
-import { WalletManager } from './wallet.js';
+import { WalletManager, createOkxInstallRow } from './wallet.js';
 
 // ---- Ranked mode: EIP-6963 multi-injected wallet integration ----------------
 
@@ -510,15 +510,17 @@ class ConnectFourApp {
     this.walletList.innerHTML = '';
     const wallets = this.wallet.getDiscoveredWallets();
 
+    const hasOkx = this.wallet.hasOkxWallet();
+
     if (wallets.length === 0) {
       if (this.noWalletsMessage) this.noWalletsMessage.style.display = 'block';
-      return;
+    } else {
+      if (this.noWalletsMessage) this.noWalletsMessage.style.display = 'none';
     }
-
-    if (this.noWalletsMessage) this.noWalletsMessage.style.display = 'none';
 
     for (const w of wallets) {
       const btn = document.createElement('button');
+      btn.type = 'button';
       btn.className = 'wallet-item';
       btn.dataset.rdns = w.info.rdns || '';
 
@@ -557,6 +559,12 @@ class ConnectFourApp {
 
       btn.addEventListener('click', () => this.handleSelectWallet(w));
       this.walletList.appendChild(btn);
+    }
+
+    // If OKX is not detected at all, append an unconnectable "OKX Wallet" install row at the end
+    if (!hasOkx) {
+      const installRow = createOkxInstallRow();
+      this.walletList.appendChild(installRow);
     }
   }
 

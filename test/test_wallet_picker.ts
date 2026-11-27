@@ -1,8 +1,8 @@
 // test/test_wallet_picker.ts
 // Unit tests for EIP-6963 Multi-Injected Wallet Discovery, Selection,
-// Gas Enforcement, and Disconnection.
+// Gas Enforcement, Disconnection, and OKX Wallet Detection & Install Row.
 
-import { WalletManager } from '../web/wallet.js';
+import { WalletManager, createOkxInstallRow, OKX_DOWNLOAD_URL } from '../web/wallet.js';
 
 interface MockCall {
   method: string;
@@ -51,7 +51,45 @@ function createMockProvider(address: string, chainId: string = '0xc4') {
   return provider;
 }
 
-// Mock browser global environment for Node.js
+// Mock browser DOM and global environment for Node.js
+class MockElement {
+  tagName: string;
+  className = '';
+  textContent = '';
+  innerHTML = '';
+  href = '';
+  target = '';
+  rel = '';
+  src = '';
+  alt = '';
+  dataset: Record<string, string> = {};
+  style: Record<string, string> = {};
+  children: MockElement[] = [];
+  listeners: Record<string, Function[]> = {};
+  attributes: Record<string, string> = {};
+
+  constructor(tagName: string) {
+    this.tagName = tagName.toUpperCase();
+  }
+  appendChild(child: MockElement) {
+    this.children.push(child);
+    return child;
+  }
+  addEventListener(evt: string, cb: Function) {
+    this.listeners[evt] = this.listeners[evt] || [];
+    this.listeners[evt].push(cb);
+  }
+  setAttribute(name: string, val: string) {
+    this.attributes[name] = val;
+  }
+  getAttribute(name: string) {
+    return this.attributes[name] ?? null;
+  }
+  replaceWith(newEl: MockElement) {
+    // noop
+  }
+}
+
 function setupMockBrowser() {
   const eventListeners: Record<string, Function[]> = {};
   const mockStorage: Record<string, string> = {};
@@ -85,7 +123,12 @@ function setupMockBrowser() {
     },
   };
 
+  const mockDocument: any = {
+    createElement: (tag: string) => new MockElement(tag),
+  };
+
   (globalThis as any).window = mockWindow;
+  (globalThis as any).document = mockDocument;
   (globalThis as any).localStorage = mockLocalStorage;
   (globalThis as any).Event = class Event {
     type: string;
@@ -100,7 +143,7 @@ function setupMockBrowser() {
     }
   };
 
-  return { mockWindow, mockLocalStorage };
+  return { mockWindow, mockLocalStorage, mockDocument };
 }
 
 async function runTests() {
@@ -194,11 +237,14 @@ async function runTests() {
     throw new Error(`Expected explicit gas 0x493e0, got ${sendCall?.params?.[0]?.gas}`);
   }
 
-  // Crucial check: Provider 1 (MetaMask) must NEVER be called
+  // Crucial check: Provider 1 (MetaMask) and OKX must NEVER be called
   if (provider1.calls.length !== 0) {
     throw new Error(`Provider 1 (MetaMask) was called ${provider1.calls.length} times, expected 0!`);
   }
-  console.log('  PASS: Provider 2 (Zerion) was used exclusively; Provider 1 was called 0 times.');
+  if (providerOKX.calls.length !== 0) {
+    throw new Error(`Provider OKX was called ${providerOKX.calls.length} times, expected 0!`);
+  }
+  console.log('  PASS: Provider 2 (Zerion) was used exclusively; Provider 1 & OKX called 0 times.');
   console.log('  PASS: Explicit gas limit (0x493e0 / 300k gas) was forwarded in eth_sendTransaction.');
 
   // 3. Disconnect Test
@@ -258,17 +304,195 @@ async function runTests() {
   }
   console.log('  PASS: User rejections and 403 simulation errors correctly parsed with user-friendly messages.');
 
-  // 6. OKX Wallet dedicated window.okxwallet injection test
-  console.log('Test 6: Dedicated window.okxwallet injection fallback');
-  (window as any).okxwallet = createMockProvider('0x3333333333333333333333333333333333333333');
-  const freshWM = new WalletManager({ chainId: 196 });
-  const okxDiscovered = freshWM.getDiscoveredWallets();
-  const okxWallet = okxDiscovered.find(w => w.info.name === 'OKX Wallet');
-  if (!okxWallet) throw new Error('OKX Wallet should be discovered via window.okxwallet fallback');
-  if (okxWallet.info.rdns !== 'com.okex.wallet') throw new Error('OKX Wallet rdns should be com.okex.wallet');
-  const okxConn = await freshWM.connect(okxWallet);
-  if (okxConn.address !== '0x3333333333333333333333333333333333333333') throw new Error('Connected to OKX Wallet');
-  console.log('  PASS: OKX Wallet discovered via window.okxwallet and successfully connected.');
+  // ---------------------------------------------------------------------------
+  // Dedicated OKX Wallet Tests (Requirements 1, 2, 3, 5)
+  // ---------------------------------------------------------------------------
+
+  // Test 6: OKX announced via EIP-6963
+  console.log('Test 6: OKX Wallet announced via EIP-6963');
+  {
+    delete (window as any).okxwallet;
+    const pMM = createMockProvider('0xaaa111');
+    const pOKX = createMockProvider('0xbbb222');
+    const wm6963 = new WalletManager({ chainId: 196 });
+    wm6963.initDiscovery();
+
+    window.dispatchEvent(new CustomEvent('eip6963:announceProvider', {
+      detail: {
+        info: { uuid: 'u-mm', name: 'MetaMask', icon: '', rdns: 'io.metamask' },
+        provider: pMM,
+      }
+    }));
+    window.dispatchEvent(new CustomEvent('eip6963:announceProvider', {
+      detail: {
+        info: { uuid: 'u-okx', name: 'OKX Wallet', icon: '', rdns: 'com.okex.wallet' },
+        provider: pOKX,
+      }
+    }));
+
+    const wallets = wm6963.getDiscoveredWallets();
+    if (wallets.length !== 2) throw new Error(`Expected 2 wallets, got ${wallets.length}`);
+    const okxItem = wallets.find(w => wm6963.isOkxWallet(w));
+    if (!okxItem) throw new Error('OKX Wallet must be in discovered list via 6963');
+    if (!wm6963.hasOkxWallet()) throw new Error('hasOkxWallet() must be true');
+
+    // Make sure other wallets still appear and none called until selected
+    if (pMM.calls.length !== 0 || pOKX.calls.length !== 0) {
+      throw new Error('No provider should be called before selection');
+    }
+
+    await wm6963.connect(okxItem);
+    if (pOKX.calls.length === 0) throw new Error('Selected OKX provider must be called');
+    if (pMM.calls.length !== 0) throw new Error('Unselected provider must have 0 calls');
+    console.log('  PASS: OKX announced via 6963 discovered, other wallets present, none called until selected.');
+  }
+
+  // Test 7: OKX only via window.okxwallet (legacy injected path)
+  console.log('Test 7: OKX Wallet only via window.okxwallet');
+  {
+    const pMM = createMockProvider('0xaaa111');
+    const pOKX = createMockProvider('0xbbb222');
+    (window as any).okxwallet = pOKX;
+
+    const wmInjected = new WalletManager({ chainId: 196 });
+    wmInjected.initDiscovery();
+
+    // MetaMask announced via 6963, OKX NOT announced via 6963
+    window.dispatchEvent(new CustomEvent('eip6963:announceProvider', {
+      detail: {
+        info: { uuid: 'u-mm', name: 'MetaMask', icon: '', rdns: 'io.metamask' },
+        provider: pMM,
+      }
+    }));
+
+    const wallets = wmInjected.getDiscoveredWallets();
+    if (wallets.length !== 2) throw new Error(`Expected 2 wallets (MetaMask + OKX), got ${wallets.length}`);
+    const okxItem = wallets.find(w => wmInjected.isOkxWallet(w));
+    if (!okxItem) throw new Error('OKX Wallet must be discovered via window.okxwallet');
+    if (okxItem.provider !== pOKX) throw new Error('OKX provider must match window.okxwallet');
+    if (okxItem.info.name !== 'OKX Wallet') throw new Error(`Expected name 'OKX Wallet', got ${okxItem.info.name}`);
+    if (!wmInjected.hasOkxWallet()) throw new Error('hasOkxWallet() must be true');
+
+    // Ensure none called until selected
+    if (pMM.calls.length !== 0 || pOKX.calls.length !== 0) {
+      throw new Error('Providers must not be called until selected');
+    }
+
+    await wmInjected.connect(okxItem);
+    if (pOKX.calls.length === 0) throw new Error('Selected OKX provider must be called');
+    if (pMM.calls.length !== 0) throw new Error('MetaMask must have 0 calls');
+    console.log('  PASS: OKX only via window.okxwallet discovered as EIP-1193, other wallets present, none called until selected.');
+  }
+
+  // Test 8: OKX announced via 6963 PLUS window.okxwallet (shows once)
+  console.log('Test 8: OKX announced via 6963 PLUS window.okxwallet (shows once)');
+  {
+    const pMM = createMockProvider('0xaaa111');
+    const pOKX_announced = createMockProvider('0xbbb222');
+    const pOKX_injected = pOKX_announced; // same or related
+    (window as any).okxwallet = pOKX_injected;
+
+    const wmBoth = new WalletManager({ chainId: 196 });
+    wmBoth.initDiscovery();
+
+    window.dispatchEvent(new CustomEvent('eip6963:announceProvider', {
+      detail: {
+        info: { uuid: 'u-mm', name: 'MetaMask', icon: '', rdns: 'io.metamask' },
+        provider: pMM,
+      }
+    }));
+    window.dispatchEvent(new CustomEvent('eip6963:announceProvider', {
+      detail: {
+        info: { uuid: 'u-okx', name: 'OKX Wallet', icon: '', rdns: 'com.okex.wallet' },
+        provider: pOKX_announced,
+      }
+    }));
+
+    const wallets = wmBoth.getDiscoveredWallets();
+    if (wallets.length !== 2) throw new Error(`Expected exactly 2 wallets, got ${wallets.length}`);
+    const okxMatches = wallets.filter(w => wmBoth.isOkxWallet(w));
+    if (okxMatches.length !== 1) {
+      throw new Error(`OKX Wallet must appear exactly once, but appeared ${okxMatches.length} times`);
+    }
+
+    if (pMM.calls.length !== 0 || pOKX_announced.calls.length !== 0) {
+      throw new Error('Providers must not be called before selection');
+    }
+    console.log('  PASS: OKX announced via 6963 + window.okxwallet appears exactly once with 0 calls before selection.');
+  }
+
+  // Test 9: OKX missing (install row shown, not connectable)
+  console.log('Test 9: OKX missing (install row shown, not connectable)');
+  {
+    delete (window as any).okxwallet;
+    delete (window as any).ethereum;
+
+    const pMM = createMockProvider('0xaaa111');
+    const pRabby = createMockProvider('0xccc333');
+
+    const wmMissing = new WalletManager({ chainId: 196 });
+    wmMissing.initDiscovery();
+
+    // MetaMask and Rabby announced, NO OKX
+    window.dispatchEvent(new CustomEvent('eip6963:announceProvider', {
+      detail: {
+        info: { uuid: 'u-mm', name: 'MetaMask', icon: '', rdns: 'io.metamask' },
+        provider: pMM,
+      }
+    }));
+    window.dispatchEvent(new CustomEvent('eip6963:announceProvider', {
+      detail: {
+        info: { uuid: 'u-rabby', name: 'Rabby Wallet', icon: '', rdns: 'io.rabby' },
+        provider: pRabby,
+      }
+    }));
+
+    const wallets = wmMissing.getDiscoveredWallets();
+    if (wallets.length !== 2) throw new Error(`Expected 2 wallets, got ${wallets.length}`);
+    if (wmMissing.hasOkxWallet()) throw new Error('hasOkxWallet() must be false when OKX missing');
+
+    // Make sure other wallets still appear and none called
+    if (pMM.calls.length !== 0 || pRabby.calls.length !== 0) {
+      throw new Error('Providers must not be called until selected');
+    }
+
+    // Verify install row creation
+    const installRow = createOkxInstallRow();
+    if (installRow.tagName !== 'A') throw new Error(`Expected install row to be <a>, got <${installRow.tagName}>`);
+    if (installRow.href !== OKX_DOWNLOAD_URL || !installRow.href.includes('okx.com')) {
+      throw new Error(`Expected install row href to point to okx.com download page, got ${installRow.href}`);
+    }
+    if (installRow.rel !== 'noopener noreferrer') {
+      throw new Error(`Expected rel="noopener noreferrer", got "${installRow.rel}"`);
+    }
+    if (installRow.target !== '_blank') {
+      throw new Error(`Expected target="_blank", got "${installRow.target}"`);
+    }
+    if (!installRow.className.includes('wallet-install-row')) {
+      throw new Error('Install row must have class wallet-install-row');
+    }
+
+    // Verify it is not connectable (calling connect with it must fail)
+    let threw = false;
+    try {
+      await wmMissing.connect(installRow as any);
+    } catch (e) {
+      threw = true;
+    }
+    if (!threw) throw new Error('Install row must not be connectable via wm.connect()');
+
+    // Other wallets must STILL have 0 calls
+    if (pMM.calls.length !== 0 || pRabby.calls.length !== 0) {
+      throw new Error('Other wallets must still have 0 calls');
+    }
+
+    // Select MetaMask now -> only MetaMask called
+    await wmMissing.connect(wallets[0]);
+    if (pMM.calls.length === 0) throw new Error('MetaMask should be called after selection');
+    if (pRabby.calls.length !== 0) throw new Error('Rabby must have 0 calls');
+
+    console.log('  PASS: When OKX is missing, install row is shown, not connectable, points to official okx.com download, other wallets appear, and none called until selected.');
+  }
 
   console.log('-'.repeat(70));
   console.log('ALL WALLET PICKER & DISCONNECT TESTS PASSED SUCCESSFULLY.');

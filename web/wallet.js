@@ -2,14 +2,62 @@
 // EIP-6963 Multi Injected Provider Discovery & Connection Manager
 // Supports MetaMask, Rabby, OKX, Zerion, Bitget, Binance, Coinbase, Trust, Phantom, etc.
 
-export const FALLBACK_WALLET_ICON = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="%2300d2ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>`;
+export const FALLBACK_WALLET_ICON = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="%237ddfd0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>`;
+
+export const OKX_WALLET_RDNS = 'com.okex.wallet';
+export const OKX_DOWNLOAD_URL = 'https://www.okx.com/download';
 
 export const WALLET_ICONS = {
   'com.okex.wallet': `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28"><rect width="28" height="28" rx="6" fill="%23000000"/><rect x="5" y="5" width="6" height="6" fill="%23ffffff"/><rect x="17" y="5" width="6" height="6" fill="%23ffffff"/><rect x="11" y="11" width="6" height="6" fill="%23ffffff"/><rect x="5" y="17" width="6" height="6" fill="%23ffffff"/><rect x="17" y="17" width="6" height="6" fill="%23ffffff"/></svg>`,
+  'com.okx.wallet': `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28"><rect width="28" height="28" rx="6" fill="%23000000"/><rect x="5" y="5" width="6" height="6" fill="%23ffffff"/><rect x="17" y="5" width="6" height="6" fill="%23ffffff"/><rect x="11" y="11" width="6" height="6" fill="%23ffffff"/><rect x="5" y="17" width="6" height="6" fill="%23ffffff"/><rect x="17" y="17" width="6" height="6" fill="%23ffffff"/></svg>`,
   'io.metamask': `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="%23ffffff"/><path d="m27.2 6.6-8.9 4-1.9-4.5z" fill="%23e17726"/><path d="m4.8 6.6 8.8 4 2-4.5z" fill="%23e27625"/><path d="m23.5 21.6-2.5 3.9 5.3 1.5 1.5-5.3z" fill="%23e27625"/><path d="m4.2 21.7 1.5 5.3 5.3-1.5-2.5-3.9z" fill="%23e27625"/><path d="m10.7 14.2-2.1 3.1 5.3.3-.2-5.7z" fill="%23e27625"/><path d="m21.3 14.2-3.1-2.4-.1 5.7 5.3-.3z" fill="%23e27625"/></svg>`,
   'io.rabby': `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28"><rect width="28" height="28" rx="6" fill="%238697FF"/><circle cx="14" cy="14" r="7" fill="%23ffffff"/></svg>`,
   'app.zerion': `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28"><rect width="28" height="28" rx="6" fill="%232962FF"/><path d="M7 9h14l-8 10h8" stroke="%23ffffff" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
 };
+
+/**
+ * Creates an unconnectable OKX Wallet install row pointing to official OKX download page.
+ */
+export function createOkxInstallRow() {
+  const installRow = document.createElement('a');
+  installRow.className = 'wallet-item wallet-install-row';
+  installRow.href = OKX_DOWNLOAD_URL;
+  installRow.target = '_blank';
+  installRow.rel = 'noopener noreferrer';
+  installRow.setAttribute('aria-label', 'Install OKX Wallet');
+
+  const left = document.createElement('div');
+  left.className = 'wallet-item-left';
+
+  const img = document.createElement('img');
+  img.className = 'wallet-icon';
+  img.src = WALLET_ICONS['com.okex.wallet'] || FALLBACK_WALLET_ICON;
+  img.alt = 'OKX Wallet';
+  img.onerror = () => {
+    const el = document.createElement('div');
+    el.className = 'wallet-icon-fallback';
+    el.innerHTML = '⚡';
+    img.replaceWith(el);
+  };
+  left.appendChild(img);
+
+  const nameSpan = document.createElement('span');
+  nameSpan.className = 'wallet-name';
+  nameSpan.textContent = 'OKX Wallet';
+  left.appendChild(nameSpan);
+
+  installRow.appendChild(left);
+
+  const right = document.createElement('div');
+  right.className = 'wallet-item-right';
+  const badge = document.createElement('span');
+  badge.className = 'wallet-install-badge';
+  badge.textContent = 'Install';
+  right.appendChild(badge);
+
+  installRow.appendChild(right);
+  return installRow;
+}
 
 export class WalletManager {
   constructor(options = {}) {
@@ -56,7 +104,7 @@ export class WalletManager {
     if (!detail || !detail.info || !detail.provider) return;
     const rdns = detail.info.rdns || '';
     const key = rdns || detail.info.uuid || detail.info.name;
-    const icon = detail.info.icon || WALLET_ICONS[rdns] || FALLBACK_WALLET_ICON;
+    const icon = detail.info.icon || WALLET_ICONS[rdns] || (this.isOkxWallet(detail) ? WALLET_ICONS['com.okex.wallet'] : null) || FALLBACK_WALLET_ICON;
 
     this.discoveredWallets.set(key, {
       info: {
@@ -67,6 +115,46 @@ export class WalletManager {
       },
       provider: detail.provider,
     });
+  }
+
+  /**
+   * Identifies whether a wallet detail, provider, or announced info is OKX Wallet.
+   */
+  isOkxWallet(detailOrProvider) {
+    if (!detailOrProvider) return false;
+    const info = detailOrProvider.info;
+    const p = detailOrProvider.provider || detailOrProvider;
+
+    if (typeof window !== 'undefined' && window.okxwallet && (p === window.okxwallet)) {
+      return true;
+    }
+
+    if (info) {
+      const rdns = (info.rdns || '').toLowerCase();
+      if (rdns === 'com.okex.wallet' || rdns === 'com.okx.wallet' || rdns.includes('okex') || rdns.includes('okx')) {
+        return true;
+      }
+      const name = (info.name || '').toLowerCase();
+      if (name.includes('okx') || name.includes('okex')) {
+        return true;
+      }
+    }
+
+    if (p && typeof p === 'object') {
+      if (p.isOKExWallet || p.isOkxWallet || p.isOkx) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Returns true if OKX Wallet is detected through EIP-6963 or window.okxwallet.
+   */
+  hasOkxWallet() {
+    const list = this.getDiscoveredWallets();
+    return list.some(w => this.isOkxWallet(w));
   }
 
   /**
@@ -83,22 +171,22 @@ export class WalletManager {
 
     const result = new Map(this.discoveredWallets);
 
-    // Specifically inspect window.okxwallet for OKX Wallet extension
+    // Specifically inspect window.okxwallet for OKX Wallet extension (legacy injected provider)
     if (typeof window !== 'undefined' && window.okxwallet && typeof window.okxwallet.request === 'function') {
-      const okxRdns = 'com.okex.wallet';
-      let alreadyExists = false;
+      const okxRdns = OKX_WALLET_RDNS;
+      let alreadyAnnounced = false;
       for (const item of result.values()) {
-        if (item.provider === window.okxwallet || item.info.rdns === okxRdns) {
-          alreadyExists = true;
+        if (item.provider === window.okxwallet || this.isOkxWallet(item)) {
+          alreadyAnnounced = true;
           break;
         }
       }
-      if (!alreadyExists) {
+      if (!alreadyAnnounced) {
         result.set(okxRdns, {
           info: {
             uuid: 'injected-okxwallet',
             name: 'OKX Wallet',
-            icon: WALLET_ICONS[okxRdns] || FALLBACK_WALLET_ICON,
+            icon: WALLET_ICONS[okxRdns] || WALLET_ICONS['com.okx.wallet'] || FALLBACK_WALLET_ICON,
             rdns: okxRdns,
           },
           provider: window.okxwallet,
@@ -123,7 +211,7 @@ export class WalletManager {
         if (!result.has(rdns)) {
           let alreadyExists = false;
           for (const item of result.values()) {
-            if (item.provider === p) {
+            if (item.provider === p || (this.isOkxWallet(p) && this.isOkxWallet(item))) {
               alreadyExists = true;
               break;
             }
@@ -133,7 +221,7 @@ export class WalletManager {
               info: {
                 uuid: `legacy-${i}-${rdns}`,
                 name,
-                icon: WALLET_ICONS[rdns] || FALLBACK_WALLET_ICON,
+                icon: WALLET_ICONS[rdns] || (this.isOkxWallet(p) ? WALLET_ICONS['com.okex.wallet'] : null) || FALLBACK_WALLET_ICON,
                 rdns,
               },
               provider: p,

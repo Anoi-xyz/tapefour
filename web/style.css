@@ -1171,6 +1171,39 @@ select.dropdown option {
   font-family: var(--font-mono);
 }
 
+.wallet-item-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+}
+
+a.wallet-item,
+.wallet-item.wallet-install-row {
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.wallet-install-badge {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(125, 223, 208, 0.12);
+  border: 1px solid rgba(125, 223, 208, 0.35);
+  color: var(--aqua);
+  font-family: var(--font-sans);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  transition: all 0.15s ease;
+}
+
+.wallet-item.wallet-install-row:hover .wallet-install-badge {
+  background: rgba(125, 223, 208, 0.24);
+  color: #ffffff;
+  border-color: var(--aqua);
+}
+
 .no-wallets-message {
   padding: 12px 0 6px;
   text-align: center;
