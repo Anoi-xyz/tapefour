@@ -518,6 +518,32 @@ select.dropdown option {
   box-shadow: 0 0 8px #ff6b81;
 }
 
+.operator-badge.unknown {
+  color: var(--mut);
+}
+.operator-badge.unknown i {
+  background: var(--mut);
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.2);
+}
+
+.operator-retry-btn {
+  background: none;
+  border: none;
+  color: var(--aqua);
+  cursor: pointer;
+  padding: 0 2px;
+  margin-left: 2px;
+  font-size: 12px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  transition: opacity 0.15s ease;
+}
+.operator-retry-btn:hover {
+  opacity: 0.8;
+  text-decoration: underline;
+}
+
 .ranked-tx {
   display: flex;
   align-items: center;

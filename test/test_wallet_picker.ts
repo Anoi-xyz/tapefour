@@ -88,6 +88,21 @@ class MockElement {
   replaceWith(newEl: MockElement) {
     // noop
   }
+  querySelector(sel: string) {
+    return new MockElement('div');
+  }
+  querySelectorAll(sel: string) {
+    return [];
+  }
+  classList = {
+    add: (cls: string) => {
+      if (!this.className.includes(cls)) this.className += ` ${cls}`;
+    },
+    remove: (cls: string) => {
+      this.className = this.className.replace(cls, '').trim();
+    },
+    contains: (cls: string) => this.className.includes(cls),
+  };
 }
 
 function setupMockBrowser() {
@@ -95,6 +110,7 @@ function setupMockBrowser() {
   const mockStorage: Record<string, string> = {};
 
   const mockWindow: any = {
+    location: { hash: '#ranked' },
     addEventListener: (event: string, cb: Function) => {
       eventListeners[event] = eventListeners[event] || [];
       eventListeners[event].push(cb);
@@ -112,6 +128,12 @@ function setupMockBrowser() {
       }
       return true;
     },
+    TAPEFOUR_CONFIG: {
+      chainId: 196,
+      rpcUrl: 'https://rpc.xlayer.tech',
+      contractAddress: '0x1c319c3bcb9ed1c35507f029c8e7152ab0590c04',
+      botOperator: '0x3318600906c5f72b02be32aad973de8e206add41',
+    },
   };
 
   const mockLocalStorage = {
@@ -123,13 +145,27 @@ function setupMockBrowser() {
     },
   };
 
+  const elementsById: Record<string, MockElement> = {};
   const mockDocument: any = {
     createElement: (tag: string) => new MockElement(tag),
+    getElementById: (id: string) => {
+      if (!elementsById[id]) elementsById[id] = new MockElement('div');
+      return elementsById[id];
+    },
+    querySelector: (sel: string) => new MockElement('div'),
+    querySelectorAll: (sel: string) => [],
+    addEventListener: () => {},
   };
 
+  (globalThis as any).Worker = class MockWorker {
+    postMessage() {}
+    terminate() {}
+    onmessage = null;
+  };
   (globalThis as any).window = mockWindow;
   (globalThis as any).document = mockDocument;
   (globalThis as any).localStorage = mockLocalStorage;
+  (globalThis as any).sessionStorage = mockLocalStorage;
   (globalThis as any).Event = class Event {
     type: string;
     constructor(type: string) { this.type = type; }
@@ -492,6 +528,99 @@ async function runTests() {
     if (pRabby.calls.length !== 0) throw new Error('Rabby must have 0 calls');
 
     console.log('  PASS: When OKX is missing, install row is shown, not connectable, points to official okx.com download, other wallets appear, and none called until selected.');
+  }
+
+  // Test 10: Ranked mode wallet connect + operator health error resilience
+  console.log('Test 10: Connect wallet in ranked mode with operator health check throwing');
+  {
+    const originalFetch = (globalThis as any).fetch;
+    const originalConsoleError = console.error;
+    let loggedErrors: any[] = [];
+    console.error = (...args: any[]) => { loggedErrors.push(args); };
+
+    let rpcCalls: any[] = [];
+    let shouldRpcThrow = true;
+
+    // Mock RPC fetch
+    (globalThis as any).fetch = async (url: any, opts: any) => {
+      const body = JSON.parse(opts.body);
+      rpcCalls.push(body);
+      if (shouldRpcThrow && body.method === 'eth_getBalance') {
+        throw new Error('RPC connection failure: 503 Service Unavailable');
+      }
+      return {
+        json: async () => ({ jsonrpc: '2.0', id: body.id ?? 1, result: '0x0' }),
+      } as any;
+    };
+
+    const { ConnectFourApp } = await import('../web/app.js');
+    const app = new ConnectFourApp();
+    app.enterRankedMode();
+
+    const pUser = createMockProvider('0x4444444444444444444444444444444444444444');
+    const walletDetail = {
+      info: { uuid: 'u-user', name: 'MetaMask', icon: '', rdns: 'io.metamask' },
+      provider: pUser,
+    };
+
+    // Connect wallet in ranked mode while RPC health check throws
+    await app.handleSelectWallet(walletDetail);
+
+    // 1. Check health check ran (eth_getBalance was called in RPC)
+    const balanceCall = rpcCalls.find((c: any) => c.method === 'eth_getBalance');
+    if (!balanceCall) {
+      throw new Error('Operator health check was not called during wallet connection');
+    }
+
+    // 2. Check wallet stays connected despite health check throwing
+    if (app.walletAddress !== '0x4444444444444444444444444444444444444444') {
+      throw new Error(`Wallet address was not preserved; got ${app.walletAddress}`);
+    }
+    if (app.rankedStatusMsg.textContent.includes('Connection failed')) {
+      throw new Error(`Status message should not show connection failure, got: ${app.rankedStatusMsg.textContent}`);
+    }
+    if (!app.rankedStatusMsg.textContent.includes('Connected with MetaMask')) {
+      throw new Error(`Status message should indicate successful connection, got: ${app.rankedStatusMsg.textContent}`);
+    }
+
+    // 3. Check badge shows "unknown" with retry action
+    if (!app.operatorBadge.className.includes('unknown')) {
+      throw new Error(`Operator badge class should contain "unknown", got: ${app.operatorBadge.className}`);
+    }
+    if (!app.operatorBadge.innerHTML.includes('Operator: unknown')) {
+      throw new Error(`Operator badge text/html should be "Operator: unknown", got: ${app.operatorBadge.innerHTML}`);
+    }
+    const retryBtn = app.operatorBadge.children.find((c: any) => c.className === 'operator-retry-btn');
+    if (!retryBtn) {
+      throw new Error('Operator badge should have a retry button element');
+    }
+
+    // 4. Test retry with healthy operator balance -> transitions to online
+    shouldRpcThrow = false;
+    (globalThis as any).fetch = async (url: any, opts: any) => {
+      const body = JSON.parse(opts.body);
+      return {
+        json: async () => ({
+          jsonrpc: '2.0',
+          id: body.id ?? 1,
+          result: body.method === 'eth_getBalance' ? '0x6f05b59d3b20000' : '0x0', // 0.5 OKB
+        }),
+      } as any;
+    };
+
+    await app.checkOperatorHealth();
+    if (!app.operatorBadge.className.includes('online')) {
+      throw new Error(`Operator badge should update to "online" after healthy retry, got: ${app.operatorBadge.className}`);
+    }
+    if (!app.operatorBadge.innerHTML.includes('Operator: Online')) {
+      throw new Error(`Operator badge should show "Operator: Online", got: ${app.operatorBadge.innerHTML}`);
+    }
+
+    // Restore original fetch and console.error
+    (globalThis as any).fetch = originalFetch;
+    console.error = originalConsoleError;
+
+    console.log('  PASS: Health check runs, wallet stays connected when health check throws, badge shows "unknown" with retry, and updates to "online" on success.');
   }
 
   console.log('-'.repeat(70));

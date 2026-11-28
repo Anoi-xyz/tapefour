@@ -25,7 +25,8 @@ function encodeUint256(n) {
   return BigInt(n).toString(16).padStart(64, '0');
 }
 function encodeAddress(addr) {
-  return addr.slice(2).toLowerCase().padStart(64, '0');
+  const clean = (addr || '').toLowerCase().replace(/^0x/, '');
+  return clean.padStart(64, '0');
 }
 
 // ---- Session key (ephemeral, stored in sessionStorage for this tab) --------
@@ -452,6 +453,69 @@ class ConnectFourApp {
     }
   }
 
+  setOperatorBadge(state, text, showRetry = false) {
+    if (!this.operatorBadge) return;
+    this.operatorBadge.style.display = 'inline-flex';
+
+    let stateClass = state;
+    if (state === 'delayed') stateClass = 'checking';
+    this.operatorBadge.className = `chip operator-badge ${stateClass}`;
+    this.operatorBadge.innerHTML = `<i></i><span>${text}</span>`;
+
+    if (showRetry) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'operator-retry-btn';
+      btn.title = 'Retry health check';
+      btn.textContent = '↻';
+      btn.setAttribute('aria-label', 'Retry operator check');
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.checkOperatorHealth();
+      });
+      this.operatorBadge.appendChild(btn);
+    }
+  }
+
+  async checkOperatorHealth() {
+    if (!this.operatorBadge) return;
+    this.setOperatorBadge('checking', 'Operator: checking...');
+
+    try {
+      let operatorAddr = CFG.botOperator;
+      if (!operatorAddr && CFG.contractAddress) {
+        try {
+          const res = await readContractView(CFG.contractAddress, '0xbd15b9c1');
+          if (res && res !== '0x' && res.length >= 66) {
+            const addr = '0x' + res.slice(26);
+            if (addr !== '0x0000000000000000000000000000000000000000') {
+              operatorAddr = addr;
+            }
+          }
+        } catch (contractErr) {
+          console.warn('Could not read botOperator from contract:', contractErr);
+        }
+      }
+      if (!operatorAddr) {
+        operatorAddr = '0x3318600906c5f72b02be32aad973de8e206add41';
+      }
+
+      const balHex = await rpcCall('eth_getBalance', [operatorAddr, 'latest']);
+      const balance = BigInt(balHex);
+
+      if (balance === 0n) {
+        this.setOperatorBadge('offline', 'Operator: Offline');
+      } else if (balance < 2_000_000_000_000_000n) {
+        this.setOperatorBadge('delayed', 'Operator: Delayed...');
+      } else {
+        this.setOperatorBadge('online', 'Operator: Online');
+      }
+    } catch (err) {
+      console.error('Operator health check error:', err);
+      this.setOperatorBadge('unknown', 'Operator: unknown', true);
+    }
+  }
+
   handleChainChanged(chainId) {
     console.log('Chain changed to:', chainId);
     this.checkNetwork();
@@ -462,6 +526,7 @@ class ConnectFourApp {
       this.executeDisconnect();
     } else {
       this.walletAddress = accounts[0];
+      this.sessionKeyAddr = accounts[0];
       this.btnConnectWallet.textContent = `${this.walletAddress.slice(0, 6)}…${this.walletAddress.slice(-4)}`;
       if (this.linkViewExplorer) {
         this.linkViewExplorer.href = `https://www.oklink.com/xlayer/address/${this.walletAddress}`;
@@ -590,10 +655,6 @@ class ConnectFourApp {
         this.linkViewExplorer.href = `https://www.oklink.com/xlayer/address/${this.walletAddress}`;
       }
       this.rankedStatusMsg.textContent = `Connected with ${walletDetail.info.name} — click New Game to start`;
-
-      await this.checkNetwork();
-      await this.loadRankedFee();
-      await this.checkOperatorHealth();
     } catch (err) {
       console.error('Wallet connect error:', err);
       if (err.isUserRejection) {
@@ -601,6 +662,24 @@ class ConnectFourApp {
       } else {
         this.rankedStatusMsg.textContent = `Connection failed: ${err.message}`;
       }
+      return;
+    }
+
+    // Post-connection checks (failures must never block or fail the wallet connection)
+    try {
+      await this.checkNetwork();
+    } catch (e) {
+      console.warn('Post-connect checkNetwork error:', e);
+    }
+    try {
+      await this.loadRankedFee();
+    } catch (e) {
+      console.warn('Post-connect loadRankedFee error:', e);
+    }
+    try {
+      await this.checkOperatorHealth();
+    } catch (e) {
+      console.warn('Post-connect checkOperatorHealth error:', e);
     }
   }
 
@@ -692,8 +771,10 @@ class ConnectFourApp {
 
     try {
       // Encode startRanked(address sessionKey)
-      const data = '0x5d4d794d' + encodeAddress(this.sessionKeyAddr);
-      const value = '0x' + (this.rankedFee ?? 1_000_000_000_000_000n).toString(16);
+      const sessionKey = this.sessionKeyAddr || this.walletAddress;
+      const data = '0x5d4d794d' + encodeAddress(sessionKey);
+      const feeWei = this.rankedFee ?? (CFG.rankedFeeWei ? BigInt(CFG.rankedFeeWei) : 5_000_000_000_000_000n);
+      const value = '0x' + feeWei.toString(16);
 
       // Explicit gas limit (300,000 gas) to avoid simulation 403 in extension wallets
       const txHash = await this.sendRankedTx(
@@ -1009,8 +1090,7 @@ class ConnectFourApp {
         this.botTimeoutMsg.textContent = '⏳ Bot operator seems delayed or offline. Waiting for move... (Refund available if inactive for 10m)';
         this.rankedStatusMsg.textContent = 'Bot operator seems offline or slow... waiting for on-chain move.';
         if (this.operatorBadge) {
-          this.operatorBadge.className = 'operator-badge checking';
-          this.operatorBadge.textContent = 'Operator: Delayed...';
+          this.setOperatorBadge('delayed', 'Operator: Delayed...');
         }
       }
       if (elapsed >= botTimeoutMs && this.btnClaimBotRefund) {
@@ -1018,8 +1098,7 @@ class ConnectFourApp {
         this.botTimeoutMsg.textContent = '🚨 Bot operator is offline (10m timeout reached). You can now claim your 100% refund!';
         this.rankedStatusMsg.textContent = 'Operator offline — 100% refund available.';
         if (this.operatorBadge) {
-          this.operatorBadge.className = 'operator-badge offline';
-          this.operatorBadge.textContent = 'Operator: Offline';
+          this.setOperatorBadge('offline', 'Operator: Offline');
         }
       }
 
@@ -1210,6 +1289,10 @@ class ConnectFourApp {
   }
 }
 
-window.addEventListener('DOMContentLoaded', () => {
-  new ConnectFourApp();
-});
+if (typeof window !== 'undefined') {
+  window.addEventListener('DOMContentLoaded', () => {
+    new ConnectFourApp();
+  });
+}
+
+export { ConnectFourApp };
