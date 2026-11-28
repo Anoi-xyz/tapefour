@@ -8,26 +8,20 @@ import {
   WINNING_LINES,
 } from './engine.js';
 import { WalletManager, createOkxInstallRow } from './wallet.js';
+import {
+  SELECTORS,
+  encodeUint256,
+  encodeAddress,
+  encodeStartRanked,
+  encodePlayMove,
+  encodeClaimBotTimeout,
+  encodeGames,
+  decodeRevertReason,
+} from './abi.js';
 
 // ---- Ranked mode: EIP-6963 multi-injected wallet integration ----------------
 
 const CFG = window.TAPEFOUR_CONFIG ?? {};
-
-// ABI selectors (pre-computed keccak256)
-const RANKED_ABI = {
-  startRanked:  '0x5d4d794d', // startRanked(address)
-  playMove:     '0x2bb86dd3', // playMove(uint256,uint8)
-  games:        '0xe5a6b10f', // games(uint256)
-  rankedFee:    '0x0d1b8e17', // rankedFee()
-};
-
-function encodeUint256(n) {
-  return BigInt(n).toString(16).padStart(64, '0');
-}
-function encodeAddress(addr) {
-  const clean = (addr || '').toLowerCase().replace(/^0x/, '');
-  return clean.padStart(64, '0');
-}
 
 // ---- Session key (ephemeral, stored in sessionStorage for this tab) --------
 function getOrCreateSessionKey() {
@@ -58,7 +52,12 @@ async function rpcCall(method, params = []) {
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
   });
   const json = await res.json();
-  if (json.error) throw new Error(`RPC ${method}: ${json.error.message}`);
+  if (json.error) {
+    const err = new Error(`RPC ${method}: ${json.error.message || JSON.stringify(json.error)}`);
+    err.data = json.error.data;
+    err.rpcError = json.error;
+    throw err;
+  }
   return json.result;
 }
 
@@ -485,7 +484,7 @@ class ConnectFourApp {
       let operatorAddr = CFG.botOperator;
       if (!operatorAddr && CFG.contractAddress) {
         try {
-          const res = await readContractView(CFG.contractAddress, '0xbd15b9c1');
+          const res = await readContractView(CFG.contractAddress, SELECTORS.botOperator);
           if (res && res !== '0x' && res.length >= 66) {
             const addr = '0x' + res.slice(26);
             if (addr !== '0x0000000000000000000000000000000000000000') {
@@ -722,10 +721,57 @@ class ConnectFourApp {
     return this.wallet.sendTransaction({ to, data, value }, gasLimit);
   }
 
+  async simulateAndSendTx(txParams, defaultGasFloor = 300000) {
+    const from = this.walletAddress;
+    const to = txParams.to;
+    const data = txParams.data;
+    const value = txParams.value || '0x0';
+
+    // 1. Preflight simulation: run eth_call from the user's address
+    try {
+      const callResult = await rpcCall('eth_call', [{ from, to, data, value }, 'latest']);
+      if (typeof callResult === 'string' && (callResult.startsWith('0x08c379a0') || callResult.startsWith('0x4e487b71'))) {
+        const reason = decodeRevertReason(callResult);
+        const err = new Error(`Transaction reverted in simulation: ${reason}`);
+        err.isSimulationRevert = true;
+        err.revertReason = reason;
+        throw err;
+      }
+    } catch (callErr) {
+      if (callErr.isSimulationRevert) throw callErr;
+      const reason = decodeRevertReason(callErr);
+      const err = new Error(`Transaction simulation reverted: ${reason}`);
+      err.isSimulationRevert = true;
+      err.revertReason = reason;
+      throw err;
+    }
+
+    // 2. Preflight gas estimation: run eth_estimateGas from the user's address
+    let estimatedGas;
+    try {
+      const estHex = await rpcCall('eth_estimateGas', [{ from, to, data, value }]);
+      estimatedGas = BigInt(estHex);
+    } catch (estErr) {
+      const reason = decodeRevertReason(estErr);
+      const err = new Error(`Gas estimation failed (transaction would revert): ${reason}`);
+      err.isSimulationRevert = true;
+      err.revertReason = reason;
+      throw err;
+    }
+
+    // 3. Safety margin (+25%) above estimate, respecting floor
+    const marginGas = (estimatedGas * 125n) / 100n;
+    const floorGas = BigInt(defaultGasFloor);
+    const gasLimit = marginGas > floorGas ? marginGas : floorGas;
+
+    // 4. Prompt the wallet only when simulation and estimate succeed
+    return this.sendRankedTx(to, data, value, gasLimit);
+  }
+
   async loadRankedFee() {
     if (!CFG.contractAddress) return;
     try {
-      const result = await readContractView(CFG.contractAddress, '0x0d1b8e17');
+      const result = await readContractView(CFG.contractAddress, SELECTORS.rankedFee);
       const fee = BigInt(result);
       this.rankedFee = fee;
       const feeEth = Number(fee) / 1e18;
@@ -765,25 +811,25 @@ class ConnectFourApp {
       return;
     }
 
-    this.rankedStatusMsg.textContent = 'Sending startRanked tx...';
+    this.rankedStatusMsg.textContent = 'Simulating startRanked transaction...';
     this.rankedTxPanel.style.display = 'flex';
-    this.rankedTxStatus.textContent = 'pending';
+    this.rankedTxStatus.textContent = 'simulating...';
 
     try {
-      // Encode startRanked(address sessionKey)
+      // Encode startRanked(address sessionKey) using generated encoder (0x173bda98)
       const sessionKey = this.sessionKeyAddr || this.walletAddress;
-      const data = '0x5d4d794d' + encodeAddress(sessionKey);
+      const data = encodeStartRanked(sessionKey);
       const feeWei = this.rankedFee ?? (CFG.rankedFeeWei ? BigInt(CFG.rankedFeeWei) : 5_000_000_000_000_000n);
       const value = '0x' + feeWei.toString(16);
 
-      // Explicit gas limit (300,000 gas) to avoid simulation 403 in extension wallets
-      const txHash = await this.sendRankedTx(
-        CFG.contractAddress,
-        data,
-        value,
+      // Preflight simulation & estimation before opening wallet
+      const txHash = await this.simulateAndSendTx(
+        { to: CFG.contractAddress, data, value },
         CFG.startRankedGas || 300000
       );
       this.showTx(txHash);
+      this.rankedTxStatus.textContent = 'pending';
+      this.rankedStatusMsg.textContent = 'Sending startRanked tx...';
 
       const rc = await waitForReceipt(txHash);
       if (rc.status !== '0x1') {
@@ -821,8 +867,8 @@ class ConnectFourApp {
       if (err.isUserRejection) {
         this.rankedStatusMsg.textContent = 'Transaction was canceled in your wallet.';
         this.rankedTxStatus.textContent = 'canceled';
-      } else if (err.isSimulationError) {
-        this.rankedStatusMsg.textContent = err.message;
+      } else if (err.isSimulationRevert || err.isSimulationError) {
+        this.rankedStatusMsg.textContent = err.revertReason || err.message;
         this.rankedTxStatus.textContent = 'simulation error';
       } else {
         this.rankedStatusMsg.textContent = `Transaction failed: ${err.message}`;
@@ -842,15 +888,13 @@ class ConnectFourApp {
     if (!this.walletAddress || !CFG.contractAddress || this.rankedGameId === null) return;
 
     this.rankedStatusMsg.textContent = `Submitting move (col ${col})...`;
-    this.rankedTxStatus.textContent = 'pending';
+    this.rankedTxStatus.textContent = 'simulating...';
 
     try {
-      // Encode playMove(uint256 gameId, uint8 col)
-      const data = '0x2bb86dd3' + encodeUint256(this.rankedGameId) + encodeUint256(col);
-      const txHash = await this.sendRankedTx(
-        CFG.contractAddress,
-        data,
-        '0x0',
+      // Encode playMove(uint256 gameId, uint8 col) using generated encoder (0xcdc6317f)
+      const data = encodePlayMove(this.rankedGameId, col);
+      const txHash = await this.simulateAndSendTx(
+        { to: CFG.contractAddress, data, value: '0x0' },
         CFG.estimatedMoveGas || 3450000
       );
       this.showTx(txHash);
@@ -869,8 +913,8 @@ class ConnectFourApp {
       if (err.isUserRejection) {
         this.rankedStatusMsg.textContent = 'Move canceled in wallet.';
         this.rankedTxStatus.textContent = 'canceled';
-      } else if (err.isSimulationError) {
-        this.rankedStatusMsg.textContent = err.message;
+      } else if (err.isSimulationRevert || err.isSimulationError) {
+        this.rankedStatusMsg.textContent = err.revertReason || err.message;
         this.rankedTxStatus.textContent = 'simulation error';
       } else {
         this.rankedStatusMsg.textContent = `Move error: ${err.message}`;
@@ -1103,8 +1147,8 @@ class ConnectFourApp {
       }
 
       try {
-        // Read game.turn from contract
-        const data = '0xe5a6b10f' + encodeUint256(this.rankedGameId);
+        // Read game.turn from contract using generated games(uint256) selector (0x117a5b90)
+        const data = encodeGames(this.rankedGameId);
         const result = await readContractView(CFG.contractAddress, data);
         if (!result || result === '0x') continue;
 
@@ -1168,12 +1212,10 @@ class ConnectFourApp {
     if (!this.walletAddress || this.rankedGameId === null) return;
     try {
       this.btnClaimBotRefund.disabled = true;
-      this.botTimeoutMsg.textContent = 'Submitting refund transaction...';
-      const data = '0xa480fae6' + encodeUint256(this.rankedGameId);
-      const txHash = await this.sendRankedTx(
-        CFG.contractAddress,
-        data,
-        '0x0',
+      this.botTimeoutMsg.textContent = 'Simulating and submitting refund transaction...';
+      const data = encodeClaimBotTimeout(this.rankedGameId);
+      const txHash = await this.simulateAndSendTx(
+        { to: CFG.contractAddress, data, value: '0x0' },
         CFG.timeoutRefundGas || 200000
       );
       this.rankedTxLink.href = `${CFG.explorerBase || 'https://www.oklink.com/xlayer/tx/'}${txHash}`;
@@ -1191,8 +1233,8 @@ class ConnectFourApp {
       console.error('Claim refund failed:', err);
       if (err.isUserRejection) {
         this.botTimeoutMsg.textContent = 'Refund transaction canceled in wallet.';
-      } else if (err.isSimulationError) {
-        this.botTimeoutMsg.textContent = err.message;
+      } else if (err.isSimulationRevert || err.isSimulationError) {
+        this.botTimeoutMsg.textContent = err.revertReason || err.message;
       } else {
         this.botTimeoutMsg.textContent = `Refund failed: ${err.message}`;
       }
